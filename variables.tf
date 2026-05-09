@@ -1,69 +1,65 @@
-variable "aws_region" {
-  type    = string
-  default = "us-east-2"
+variable "project" {
+  description = "Project identity used for tags and resource naming."
+  type = object({
+    name        = string
+    environment = string
+  })
+  default = {
+    name        = "prog-strength"
+    environment = "prod"
+  }
 }
 
-variable "project_name" {
-  type    = string
-  default = "prog-strength"
+variable "aws" {
+  description = "AWS region and AZ for all resources."
+  type = object({
+    region            = string
+    availability_zone = string
+  })
+  default = {
+    region            = "us-east-2"
+    availability_zone = "us-east-2b"
+  }
 }
 
-variable "environment" {
-  type    = string
-  default = "prod"
+variable "network" {
+  description = "VPC and subnet CIDRs."
+  type = object({
+    vpc_cidr           = string
+    public_subnet_cidr = string
+  })
+  default = {
+    vpc_cidr           = "10.0.0.0/16"
+    public_subnet_cidr = "10.0.1.0/24"
+  }
 }
 
-variable "availability_zone" {
-  type    = string
-  default = "us-east-2b"
-}
-
-variable "vpc_cidr" {
-  type    = string
-  default = "10.0.0.0/16"
-}
-
-variable "public_subnet_cidr" {
-  type    = string
-  default = "10.0.1.0/24"
-}
-
-variable "instance_type" {
-  type    = string
-  default = "t4g.small"
-}
-
-variable "ami_name_pattern" {
-  description = "AMI name with wildcards. Latest matching AMI is selected."
-  type        = string
-  default     = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"
-}
-
-variable "ami_owner" {
-  description = "AWS account ID that owns the AMI. 099720109477 = Canonical."
-  type        = string
-  default     = "099720109477"
-}
-
-variable "ssh_key_name" {
-  description = "Name of an existing EC2 key pair (looked up via data source, not managed by TF)."
-  type        = string
-  default     = "prog-strength-backend-prod-keys"
-}
-
-variable "root_volume_size" {
-  type    = number
-  default = 8
-}
-
-variable "ingress_rules" {
-  description = "Ingress rules for the API security group."
-  type = list(object({
-    description = string
-    protocol    = string
-    from_port   = number
-    to_port     = number
-    cidr_blocks = list(string)
-  }))
-  default = []
+variable "compute" {
+  description = "EC2 instance config and the security group rules attached to it."
+  type = object({
+    instance_type    = string
+    ami_name_pattern = string
+    ami_owner        = string
+    ssh_key_name     = string
+    root_volume_size = number
+    security_group = object({
+      ingress_rules = list(object({
+        description = string
+        protocol    = string
+        from_port   = number
+        to_port     = number
+        cidr_blocks = list(string)
+      }))
+    })
+  })
+  default = {
+    instance_type    = "t4g.small"
+    ami_name_pattern = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"
+    ami_owner        = "099720109477"
+    ssh_key_name     = "prog-strength-backend-prod-keys"
+    root_volume_size = 8
+    security_group = {
+      ingress_rules = []
+    }
+  }
 }

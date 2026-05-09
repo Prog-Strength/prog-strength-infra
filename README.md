@@ -32,23 +32,40 @@ workflow: open a PR, review the plan, merge to apply.
 
 ## Variables
 
-All inputs are defined in `variables.tf` with sensible defaults. The operator-facing
+Inputs are grouped into four object-typed variables in `variables.tf`. The operator-facing
 overrides for prod live in `environments/prod.tfvars`.
 
-| Variable             | Default                            | Notes                                                  |
-| -------------------- | ---------------------------------- | ------------------------------------------------------ |
-| `aws_region`         | `us-east-2`                        |                                                        |
-| `project_name`       | `prog-strength`                    | Used for tags and the `name_prefix` local.             |
-| `environment`        | `prod`                             |                                                        |
-| `availability_zone`  | `us-east-2b`                       | Single AZ — no multi-AZ in v1.                         |
-| `vpc_cidr`           | `10.0.0.0/16`                      |                                                        |
-| `public_subnet_cidr` | `10.0.1.0/24`                      |                                                        |
-| `instance_type`      | `t4g.small`                        | Graviton; AMI must match `arm64`.                      |
-| `ami_name_pattern`   | Ubuntu 24.04 noble arm64 (gp3)     | Filter passed to `aws_ami` data source.                |
-| `ami_owner`          | `099720109477` (Canonical)         |                                                        |
-| `ssh_key_name`       | `prog-strength-backend-prod-keys`  | Key pair must already exist in EC2.                    |
-| `root_volume_size`   | `8`                                | GiB; gp3 encrypted root.                               |
-| `ingress_rules`      | `[]`                               | Set in `environments/prod.tfvars`. SSH/80/443 by default. |
+### `project`
+
+| Field         | Default         | Notes                                          |
+| ------------- | --------------- | ---------------------------------------------- |
+| `name`        | `prog-strength` | Used for tags and the `name_prefix` local.     |
+| `environment` | `prod`          |                                                |
+
+### `aws`
+
+| Field               | Default      | Notes                            |
+| ------------------- | ------------ | -------------------------------- |
+| `region`            | `us-east-2`  |                                  |
+| `availability_zone` | `us-east-2b` | Single AZ — no multi-AZ in v1.   |
+
+### `network`
+
+| Field                | Default       |
+| -------------------- | ------------- |
+| `vpc_cidr`           | `10.0.0.0/16` |
+| `public_subnet_cidr` | `10.0.1.0/24` |
+
+### `compute`
+
+| Field                            | Default                           | Notes                                                     |
+| -------------------------------- | --------------------------------- | --------------------------------------------------------- |
+| `instance_type`                  | `t4g.small`                       | Graviton; AMI must match `arm64`.                         |
+| `ami_name_pattern`               | Ubuntu 24.04 noble arm64 (gp3)    | Filter passed to `aws_ami` data source.                   |
+| `ami_owner`                      | `099720109477` (Canonical)        |                                                           |
+| `ssh_key_name`                   | `prog-strength-backend-prod-keys` | Key pair must already exist in EC2.                       |
+| `root_volume_size`               | `8`                               | GiB; gp3 encrypted root.                                  |
+| `security_group.ingress_rules`   | `[]`                              | Set in `environments/prod.tfvars`. SSH/80/443 by default. |
 
 ## Outputs
 
