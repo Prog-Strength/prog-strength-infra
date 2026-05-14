@@ -1,0 +1,45 @@
+name: Deploy Caddyfile
+
+# Pushes Caddy config changes to the EC2 host without waiting for an api
+# release. The api release workflow also pulls this repo on every deploy,
+# so this workflow only matters when Caddy config changes *between* api
+# releases — e.g. adding a new vhost for the MCP server.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'caddy/**'
+      - '.github/workflows/deploy-caddy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-caddy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reload Caddy on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/prog-strength-infra
+            git fetch --prune
+            git checkout main
+            git pull --ff-only
+
+            # Reload Caddy in-place so issued Let's Encrypt certs stay
+            # in caddy_data and active connections aren't dropped. The
+            # config path matches the bind-mount target in the api's
+            # docker-compose.yml.
+            cd /home/ubuntu/prog-strength
+            docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
+            docker compose ps caddy
