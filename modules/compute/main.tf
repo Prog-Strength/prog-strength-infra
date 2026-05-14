@@ -25,6 +25,15 @@ resource "aws_instance" "api" {
   key_name                    = data.aws_key_pair.ssh.key_name
   associate_public_ip_address = false
 
+  # First-boot setup: installs Docker, clones the api + infra repos, prepares
+  # the SQLite data dir. See bootstrap.sh for details. The script only runs
+  # on a *new* instance — `ignore_changes` below keeps edits from triggering
+  # a replacement that would wipe the SQLite DB on the existing host.
+  user_data = templatefile("${path.module}/bootstrap.sh", {
+    api_repo_url   = var.bootstrap.api_repo_url
+    infra_repo_url = var.bootstrap.infra_repo_url
+  })
+
   metadata_options {
     http_tokens                 = "required"
     http_put_response_hop_limit = 2
@@ -43,9 +52,10 @@ resource "aws_instance" "api" {
   }
 
   # Pin AMI so a new Ubuntu publish doesn't replace the host (and wipe the SQLite DB).
-  # To roll the AMI deliberately, taint this resource.
+  # user_data is ignored for the same reason — editing bootstrap.sh should not
+  # recreate the live host. To roll either deliberately, taint this resource.
   lifecycle {
-    ignore_changes = [ami]
+    ignore_changes = [ami, user_data]
   }
 }
 

@@ -29,3 +29,11 @@ variable "ssh_key_name" {
 variable "root_volume_size" {
   type = number
 }
+
+variable "bootstrap" {
+  description = "Repos cloned into the EC2 host by user_data on first boot. Both must be reachable without auth from the instance."
+  type = object({
+    api_repo_url   = string
+    infra_repo_url = string
+  })
+}

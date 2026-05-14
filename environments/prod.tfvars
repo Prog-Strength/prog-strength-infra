@@ -56,6 +56,12 @@ compute = {
       },
     ]
   }
+  bootstrap = {
+    # Repos cloned by user_data on first boot. Both must be public (or the
+    # instance role / a deploy key would need to be set up here).
+    api_repo_url   = "https://github.com/Prog-Strength/prog-strength-api.git"
+    infra_repo_url = "https://github.com/Prog-Strength/prog-strength-infra.git"
+  }
 }
 
 

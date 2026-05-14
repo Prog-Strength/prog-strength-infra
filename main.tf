@@ -26,4 +26,5 @@ module "compute" {
   ami_owner          = var.compute.ami_owner
   ssh_key_name       = var.compute.ssh_key_name
   root_volume_size   = var.compute.root_volume_size
+  bootstrap          = var.compute.bootstrap
 }

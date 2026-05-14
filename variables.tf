@@ -51,6 +51,10 @@ variable "compute" {
         cidr_blocks = list(string)
       }))
     })
+    bootstrap = object({
+      api_repo_url   = string
+      infra_repo_url = string
+    })
   })
   default = {
     instance_type    = "t4g.small"
@@ -60,6 +64,10 @@ variable "compute" {
     root_volume_size = 8
     security_group = {
       ingress_rules = []
+    }
+    bootstrap = {
+      api_repo_url   = "https://github.com/Prog-Strength/prog-strength-api.git"
+      infra_repo_url = "https://github.com/Prog-Strength/prog-strength-infra.git"
     }
   }
 }

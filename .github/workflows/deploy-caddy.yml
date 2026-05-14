@@ -40,6 +40,6 @@ jobs:
             # in caddy_data and active connections aren't dropped. The
             # config path matches the bind-mount target in the api's
             # docker-compose.yml.
-            cd /home/ubuntu/prog-strength
+            cd /home/ubuntu/prog-strength-api
             docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
             docker compose ps caddy
