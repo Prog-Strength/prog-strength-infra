@@ -32,6 +32,7 @@ resource "aws_instance" "api" {
   user_data = templatefile("${path.module}/bootstrap.sh", {
     api_repo_url   = var.bootstrap.api_repo_url
     infra_repo_url = var.bootstrap.infra_repo_url
+    mcp_repo_url   = var.bootstrap.mcp_repo_url
   })
 
   metadata_options {

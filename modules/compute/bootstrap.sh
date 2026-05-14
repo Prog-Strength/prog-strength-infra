@@ -31,21 +31,28 @@ usermod -aG docker ubuntu
 
 # --- Clone application + infra repos ----------------------------------------
 #
-# Both repos are public, so no credentials are needed. Clones run as the
-# ubuntu user so the working trees aren't root-owned (which would block the
-# release workflow's `git pull` / `git checkout` over SSH).
+# All repos are public, so no credentials are needed. Clones run as the
+# ubuntu user so the working trees aren't root-owned (which would block
+# the deploy workflows' `git pull` / `git checkout` over SSH).
 #
-# Directory layout matches what release.yml and deploy-caddy.yml SSH into:
-#   /home/ubuntu/prog-strength-api    — api repo (cloned at HEAD of main)
-#   /home/ubuntu/prog-strength-infra  — infra repo (Caddyfile lives here)
+# Directory layout matches what the deploy workflows SSH into:
+#   /home/ubuntu/prog-strength-api    — api repo (release.yml)
+#   /home/ubuntu/prog-strength-infra  — infra repo (deploy-caddy.yml)
+#   /home/ubuntu/prog-strength-mcp    — mcp repo (deploy.yml)
 
 sudo -u ubuntu git clone "${api_repo_url}" /home/ubuntu/prog-strength-api
 sudo -u ubuntu git clone "${infra_repo_url}" /home/ubuntu/prog-strength-infra
+sudo -u ubuntu git clone "${mcp_repo_url}" /home/ubuntu/prog-strength-mcp
 
 # SQLite data dir. docker-compose.yml bind-mounts `./data:/data` from the
 # api working dir, so pre-creating it avoids the volume being root-owned
 # the first time docker creates it implicitly.
 sudo -u ubuntu mkdir -p /home/ubuntu/prog-strength-api/data
+
+# Shared docker network used by all services on this host. Both the api
+# and mcp compose files declare it as `external: true` so they don't try
+# to create or destroy it themselves — its lifecycle belongs here.
+docker network create prog-strength 2>/dev/null || true
 
 # --- fastfetch (login banner) -----------------------------------------------
 #
