@@ -55,8 +55,14 @@ resource "aws_instance" "api" {
   # Pin AMI so a new Ubuntu publish doesn't replace the host (and wipe the SQLite DB).
   # user_data is ignored for the same reason — editing bootstrap.sh should not
   # recreate the live host. To roll either deliberately, taint this resource.
+  #
+  # associate_public_ip_address is ignored because of a quirk in the AWS provider:
+  # once aws_eip_association.api attaches an EIP, AWS reports the primary ENI as
+  # having a public IP and the provider surfaces that as `true` — drifting from
+  # the configured `false`. EC2 doesn't allow toggling that attribute in-place,
+  # so without this entry every subsequent apply forces a destroy+recreate.
   lifecycle {
-    ignore_changes = [ami, user_data]
+    ignore_changes = [ami, user_data, associate_public_ip_address]
   }
 }
 
