@@ -1,0 +1,27 @@
+# pre-commit config — shortens the feedback loop for the checks that CI
+# already enforces in .github/workflows/plan.yml. Run `pre-commit install`
+# once after cloning; from then on `git commit` runs these locally.
+#
+# Update pinned versions with `pre-commit autoupdate`.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-added-large-files
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.96.2
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_validate
+        args:
+          # -backend=false lets validate run without AWS credentials or
+          # network access to the S3 state bucket — keeps `git commit`
+          # fast and offline-friendly. CI does a full `init` + `validate`
+          # against the real backend in plan.yml.
+          - --tf-init-args=-backend=false

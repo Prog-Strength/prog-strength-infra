@@ -1,5 +1,10 @@
 name: Terraform Plan
 
+# Runs on every PR targeting main. Enforces formatting and validation as
+# gating checks, then runs `terraform plan` and posts the output as a
+# sticky comment on the PR so the author can review what `terraform apply`
+# would do before merging. Apply itself runs on push to main — see apply.yml.
+
 on:
   pull_request:
     branches: [main]
@@ -7,6 +12,12 @@ on:
 permissions:
   contents: read
   pull-requests: write
+
+concurrency:
+  # One in-flight plan per PR. New pushes cancel the previous run — the
+  # latest commit is the only plan that matters for review.
+  group: terraform-plan-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   plan:
@@ -24,7 +35,78 @@ jobs:
         with:
           terraform_version: 1.13.0
 
-      - run: terraform fmt -check -recursive
-      - run: terraform init
-      - run: terraform validate
-      - run: terraform plan -var-file=environments/prod.tfvars -no-color
+      # Gating checks — these failing is an unambiguous "do not merge" signal,
+      # so they run before plan to fail fast and avoid posting a confusing
+      # plan comment when the code isn't even well-formed.
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+
+      - name: terraform init
+        run: terraform init
+
+      - name: terraform validate
+        run: terraform validate
+
+      # -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes present.
+      # We swallow exit 2 because a destructive plan is exactly the case
+      # we want to *show* in a PR comment, not block the workflow on.
+      # Exit 1 (a real error) still fails the workflow.
+      - name: terraform plan
+        id: plan
+        run: |
+          set +e
+          terraform plan -no-color -var-file=environments/prod.tfvars -detailed-exitcode > plan.txt 2>&1
+          ec=$?
+          cat plan.txt
+          echo "$ec" > plan.exitcode
+          if [ "$ec" = "1" ]; then exit 1; fi
+          exit 0
+
+      - name: Post plan to PR
+        if: always() && steps.plan.conclusion != 'skipped'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.existsSync('plan.txt') ? fs.readFileSync('plan.txt', 'utf8') : '(no plan output captured)';
+            const ec = fs.existsSync('plan.exitcode') ? fs.readFileSync('plan.exitcode', 'utf8').trim() : 'unknown';
+
+            // PR comments are capped at ~65k chars. Truncate aggressively to
+            // leave headroom for the markdown chrome around the fenced block.
+            const MAX = 55000;
+            const body_plan = plan.length > MAX
+              ? plan.slice(0, MAX) + '\n\n... [output truncated; see workflow log for full plan] ...'
+              : plan;
+
+            const summary = ec === '0'
+              ? 'No changes. Infrastructure matches configuration.'
+              : ec === '2'
+              ? 'Changes detected. Review the plan below carefully before merging — anything tagged `# forces replacement` will destroy and recreate the resource.'
+              : 'Plan failed. See the workflow log.';
+
+            const marker = '<!-- terraform-plan -->';
+            const body = `${marker}\n## Terraform Plan\n\n${summary}\n\n<details><summary>Show plan output</summary>\n\n\`\`\`hcl\n${body_plan}\n\`\`\`\n\n</details>`;
+
+            // Sticky comment: replace any previous plan comment instead of
+            // appending a new one on every push.
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body && c.body.startsWith(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
