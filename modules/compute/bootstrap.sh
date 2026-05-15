@@ -17,6 +17,16 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get upgrade -y
 
+# --- Host operator tooling --------------------------------------------------
+#
+# sqlite3 CLI for ad-hoc inspection of the api's database at
+# /home/ubuntu/prog-strength-api/data/app.db. The api itself doesn't need
+# this — go-sqlite3 is statically linked into the binary — but having the
+# CLI on the host means an SSH'd operator can run `sqlite3 -readonly ...`
+# without first apt-installing anything.
+
+apt-get install -y sqlite3
+
 # --- Docker Engine + Compose v2 ---------------------------------------------
 #
 # Use Docker's official convenience script — it installs the engine and the

@@ -31,6 +31,11 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Abort on the first failing command — see release.yml in the
+            # api repo for the longer story. Short version: without this,
+            # the action reports green even when `caddy reload` errors.
+            set -e
+
             cd /home/ubuntu/prog-strength-infra
             git fetch --prune
             git checkout main
