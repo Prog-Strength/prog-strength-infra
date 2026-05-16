@@ -23,6 +23,16 @@ network = {
   public_subnet_cidr = "10.0.1.0/24"
 }
 
+# --- Backup Configurations (Litestream → S3) ---
+
+backup = {
+  # Globally-unique bucket name; the API host's litestream.yml references
+  # this same value via the LITESTREAM_REPLICA_BUCKET env var. Versioned
+  # + lifecycled inside the module.
+  bucket_name                        = "prog-strength-database-backups"
+  noncurrent_version_expiration_days = 30
+}
+
 # --- Compute Configurations (API & Database) ---
 
 compute = {
@@ -64,5 +74,3 @@ compute = {
     mcp_repo_url   = "https://github.com/Prog-Strength/prog-strength-mcp.git"
   }
 }
-
-

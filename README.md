@@ -67,16 +67,36 @@ overrides for prod live in `environments/prod.tfvars`.
 | `root_volume_size`               | `8`                               | GiB; gp3 encrypted root.                                  |
 | `security_group.ingress_rules`   | `[]`                              | Set in `environments/prod.tfvars`. SSH/80/443 by default. |
 
+The instance also gets the IAM instance profile produced by the `backup`
+module attached automatically (see `main.tf`) so on-host services like
+Litestream can call AWS without static keys.
+
+### `backup`
+
+Litestream replica bucket + IAM role/policy. Owned by `modules/backup/`.
+
+| Field                                | Default                            | Notes                                                                |
+| ------------------------------------ | ---------------------------------- | -------------------------------------------------------------------- |
+| `bucket_name`                        | `prog-strength-database-backups`   | Globally-unique S3 name. Referenced from the API host's `.env`.      |
+| `noncurrent_version_expiration_days` | `30`                               | Lifecycle rule on the versioned bucket; bounds storage cost.         |
+
+The bucket is private (public access fully blocked), versioned, and
+SSE-S3 encrypted. The associated IAM role grants `s3:Get/Put/Delete/List`
+on this bucket only and is exposed via an instance profile attached to
+`aws_instance.api`.
+
 ## Outputs
 
-| Output                | Use                                                                |
-| --------------------- | ------------------------------------------------------------------ |
-| `instance_public_ip`  | Paste into the registrar's DNS A record for `api.progstrength.fitness`. |
-| `instance_public_dns` | EIP-derived public DNS name.                                       |
-| `instance_id`         | For SSM, console links, etc.                                       |
-| `vpc_id`              |                                                                    |
-| `public_subnet_id`    |                                                                    |
-| `security_group_id`   |                                                                    |
+| Output                        | Use                                                                     |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `instance_public_ip`          | Paste into the registrar's DNS A record for `api.progstrength.fitness`. |
+| `instance_public_dns`         | EIP-derived public DNS name.                                            |
+| `instance_id`                 | For SSM, console links, etc.                                            |
+| `vpc_id`                      |                                                                         |
+| `public_subnet_id`            |                                                                         |
+| `security_group_id`           |                                                                         |
+| `litestream_bucket_name`      | Set as `LITESTREAM_REPLICA_BUCKET` in the API host's `.env`.            |
+| `api_instance_profile_name`   | Visibility only — already wired into `aws_instance.api`.                |
 
 After apply:
 

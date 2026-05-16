@@ -34,6 +34,18 @@ variable "network" {
   }
 }
 
+variable "backup" {
+  description = "Litestream S3 replica bucket + IAM role/profile config. The bucket holds SQLite WAL frames and snapshots; the IAM role is attached to the API EC2 instance so Litestream authenticates without static keys."
+  type = object({
+    bucket_name                        = string
+    noncurrent_version_expiration_days = number
+  })
+  default = {
+    bucket_name                        = "prog-strength-database-backups"
+    noncurrent_version_expiration_days = 30
+  }
+}
+
 variable "compute" {
   description = "EC2 instance config and the security group rules attached to it."
   type = object({
