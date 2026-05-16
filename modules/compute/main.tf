@@ -24,6 +24,7 @@ resource "aws_instance" "api" {
   vpc_security_group_ids      = var.security_group_ids
   key_name                    = data.aws_key_pair.ssh.key_name
   associate_public_ip_address = false
+  iam_instance_profile        = var.iam_instance_profile_name
 
   # First-boot setup: installs Docker, clones the api + infra repos, prepares
   # the SQLite data dir. See bootstrap.sh for details. The script only runs

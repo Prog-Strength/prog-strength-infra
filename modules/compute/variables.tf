@@ -38,3 +38,8 @@ variable "bootstrap" {
     mcp_repo_url   = string
   })
 }
+
+variable "iam_instance_profile_name" {
+  description = "Instance profile attached to the API instance, used by Litestream (and any future host-side AWS clients) to authenticate without static keys. Sourced from the backup module."
+  type        = string
+}
