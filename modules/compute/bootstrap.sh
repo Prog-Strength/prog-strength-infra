@@ -49,10 +49,12 @@ usermod -aG docker ubuntu
 #   /home/ubuntu/prog-strength-api    — api repo (release.yml)
 #   /home/ubuntu/prog-strength-infra  — infra repo (deploy-caddy.yml)
 #   /home/ubuntu/prog-strength-mcp    — mcp repo (deploy.yml)
+#   /home/ubuntu/prog-strength-agent  — agent repo (deploy.yml)
 
 sudo -u ubuntu git clone "${api_repo_url}" /home/ubuntu/prog-strength-api
 sudo -u ubuntu git clone "${infra_repo_url}" /home/ubuntu/prog-strength-infra
 sudo -u ubuntu git clone "${mcp_repo_url}" /home/ubuntu/prog-strength-mcp
+sudo -u ubuntu git clone "${agent_repo_url}" /home/ubuntu/prog-strength-agent
 
 # SQLite data dir. docker-compose.yml bind-mounts `./data:/data` from the
 # api working dir, so pre-creating it avoids the volume being root-owned

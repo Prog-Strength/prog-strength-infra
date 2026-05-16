@@ -34,6 +34,7 @@ resource "aws_instance" "api" {
     api_repo_url   = var.bootstrap.api_repo_url
     infra_repo_url = var.bootstrap.infra_repo_url
     mcp_repo_url   = var.bootstrap.mcp_repo_url
+    agent_repo_url = var.bootstrap.agent_repo_url
   })
 
   metadata_options {
