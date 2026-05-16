@@ -17,3 +17,7 @@ api.progstrength.fitness {
 mcp.progstrength.fitness {
 	reverse_proxy mcp:8000
 }
+
+agent.progstrength.fitness {
+	reverse_proxy agent:8001
+}

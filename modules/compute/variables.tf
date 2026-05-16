@@ -36,6 +36,7 @@ variable "bootstrap" {
     api_repo_url   = string
     infra_repo_url = string
     mcp_repo_url   = string
+    agent_repo_url = string
   })
 }
 
