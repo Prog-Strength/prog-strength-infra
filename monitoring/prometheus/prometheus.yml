@@ -1,0 +1,44 @@
+# Prometheus scrape config for the Prog Strength backend.
+#
+# All targets resolve via Docker's internal DNS on the shared
+# `prog-strength` network. No external scrape targets — everything
+# we care about runs on the same host.
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  # External label attached to every metric this Prometheus produces.
+  # Useful if a second Prom instance is ever added (federation, dev
+  # vs prod, etc.) — without it, identical metric streams from two
+  # Proms would be indistinguishable.
+  external_labels:
+    deployment: prog-strength-prod
+
+scrape_configs:
+  # Self-scrape so the dashboards can show Prometheus's own health
+  # alongside the application's.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Host metrics — CPU, memory, disk, network — from the
+  # node_exporter sidecar.
+  - job_name: node
+    static_configs:
+      - targets: ["node_exporter:9100"]
+
+  # Go API. Custom metrics live under the ps_ prefix
+  # (ps_http_requests_total, ps_http_request_duration_seconds);
+  # default Go runtime metrics (go_goroutines, go_gc_duration_seconds)
+  # come for free from prometheus/client_golang.
+  - job_name: api
+    static_configs:
+      - targets: ["api:8080"]
+    metrics_path: /metrics
+
+  # FastAPI agent. Default metrics from prometheus-fastapi-instrumentator
+  # — http_requests_total, http_request_duration_seconds, etc.
+  - job_name: agent
+    static_configs:
+      - targets: ["agent:8001"]
+    metrics_path: /metrics

@@ -1,0 +1,18 @@
+# Datasource auto-provisioned by Grafana on startup. Read by the
+# grafana container from /etc/grafana/provisioning/datasources/ —
+# see the volume mount in docker-compose.monitoring.yml.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    # Explicit UID so provisioned dashboards can reference it without
+    # depending on Grafana's auto-assignment. Dashboard JSONs use
+    # {"type": "prometheus", "uid": "prometheus"} as their datasource.
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    # Resolves via Docker DNS on the shared `prog-strength` network.
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

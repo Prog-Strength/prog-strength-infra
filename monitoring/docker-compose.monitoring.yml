@@ -1,0 +1,94 @@
+# Monitoring stack — Prometheus + Grafana + node_exporter.
+#
+# Merged into the prog-strength-api deploy via a second -f flag in the
+# release workflow:
+#
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f /home/ubuntu/prog-strength-infra/monitoring/docker-compose.monitoring.yml \
+#     up --build -d
+#
+# Services here join the shared `prog-strength` external network so
+# Prometheus can scrape api:8080/metrics and agent:8001/metrics by
+# in-network hostname. None of these services bind public ports —
+# Grafana is bound only to 127.0.0.1:3000 on the host so an SSH
+# tunnel can forward it locally without exposing the dashboard to
+# the public internet. See
+# prog-strength-docs/sows/monitoring-and-observability.md.
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    # Mount the static scrape config + a persistent volume for TSDB
+    # data. Retention is short by default (15 days) — Prom is
+    # disposable and the SOW makes that explicit.
+    volumes:
+      - ${PROG_STRENGTH_INFRA_DIR:-/home/ubuntu/prog-strength-infra}/monitoring/prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    restart: unless-stopped
+
+  # Host metrics (CPU, memory, disk, network). Mounts the host's
+  # /proc, /sys, and root read-only so the exporter can read the
+  # data the kernel exposes without touching host state.
+  node_exporter:
+    image: prom/node-exporter:v1.9.1
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers)($$|/)"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.2.1
+    # Bound to 127.0.0.1 only — Grafana is reachable via SSH tunnel
+    # (`ssh -L 3000:127.0.0.1:3000 host`) and never directly from the
+    # public internet. No Caddy vhost, no external auth integration.
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      # Default admin password. Change it via the Grafana UI on first
+      # login; this env var only seeds the initial value.
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Default install disables anonymous access — only the admin
+      # account (and any others created in the UI) can read dashboards.
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      # Skip Grafana's "you should change your password" nag on first
+      # login. The SSH-tunnel-only access path is the real boundary.
+      - GF_SECURITY_DISABLE_INITIAL_ADMIN_PASSWORD_CHANGE=true
+    volumes:
+      # Provisioning auto-creates the Prometheus datasource and
+      # registers the dashboards directory at startup. No clicks
+      # through the UI needed to wire things together.
+      - ${PROG_STRENGTH_INFRA_DIR:-/home/ubuntu/prog-strength-infra}/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ${PROG_STRENGTH_INFRA_DIR:-/home/ubuntu/prog-strength-infra}/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      # Grafana's own SQLite-backed config store (users, preferences,
+      # API tokens, etc.). MUST persist or every restart wipes the
+      # admin password and any dashboards saved through the UI.
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+# Same external network as api/mcp/agent so Prometheus can scrape by
+# service hostname (api, agent, node_exporter, etc.). external: true
+# means compose won't create or destroy the network — bootstrap.sh
+# owns its lifecycle.
+networks:
+  default:
+    name: prog-strength
+    external: true
