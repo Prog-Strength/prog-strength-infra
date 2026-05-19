@@ -9,10 +9,122 @@
   "panels": [
     {
       "id": 1,
+      "type": "stat",
+      "title": "Requests (24h)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(ps_http_requests_total[24h]))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "blue"}},
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "5xx error rate (24h)",
+      "description": "Fraction of requests in the last 24h that returned 5xx. 4xx are excluded — those are client errors (bad auth, malformed input) and rarely indicate a real problem.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "100 * sum(increase(ps_http_requests_total{status=~\"5..\"}[24h])) / clamp_min(sum(increase(ps_http_requests_total[24h])), 1)",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.5},
+              {"color": "red", "value": 2}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "p95 latency (now)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {"unit": "s", "decimals": 3, "color": {"mode": "fixed", "fixedColor": "orange"}},
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "p99 latency (now)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {"unit": "s", "decimals": 3, "color": {"mode": "fixed", "fixedColor": "red"}},
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
       "type": "timeseries",
       "title": "Request rate (RPS, by route)",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -22,22 +134,38 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "reqps"},
+        "defaults": {
+          "unit": "reqps",
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
         "overrides": []
       }
     },
     {
-      "id": 2,
+      "id": 6,
       "type": "timeseries",
-      "title": "Latency p95 (by route)",
+      "title": "Latency percentiles (p50 / p95 / p99)",
+      "description": "Overall request latency across every route. Use the per-route variants by clicking 'Edit' on this panel and adding a label filter, or drill down via 5xx rate by route if the cause of a spike is unclear.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "histogram_quantile(0.95, sum by (route, le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
-          "legendFormat": "{{route}}",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50",
           "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99",
+          "refId": "C"
         }
       ],
       "fieldConfig": {
@@ -46,16 +174,17 @@
       }
     },
     {
-      "id": 3,
+      "id": 7,
       "type": "timeseries",
-      "title": "Error rate (4xx + 5xx)",
+      "title": "5xx rate by route",
+      "description": "Server-side errors broken out by route. A spike here usually points at a specific handler — start there, not at infra.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum by (status) (rate(ps_http_requests_total{status=~\"4..|5..\"}[5m]))",
-          "legendFormat": "{{status}}",
+          "expr": "sum by (route) (rate(ps_http_requests_total{status=~\"5..\"}[5m]))",
+          "legendFormat": "{{route}}",
           "refId": "A"
         }
       ],
@@ -65,28 +194,69 @@
       }
     },
     {
-      "id": 4,
-      "type": "stat",
-      "title": "Top routes (last 1h)",
+      "id": 8,
+      "type": "bargauge",
+      "title": "Top routes (24h)",
+      "description": "Leaderboard of routes by total requests over the last 24 hours.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "topk(5, sum by (route) (increase(ps_http_requests_total[1h])))",
+          "expr": "topk(10, sum by (route) (increase(ps_http_requests_total[24h])))",
           "legendFormat": "{{route}}",
           "refId": "A",
           "instant": true
         }
       ],
       "options": {
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
-        "textMode": "value_and_name",
         "orientation": "horizontal",
-        "colorMode": "value"
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
       },
       "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 0},
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Goroutines",
+      "description": "Active goroutines inside the API process. Steady-state is small (~20-50); a slow climb usually means a leak — a request handler spawning goroutines that never exit.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "go_goroutines{job=\"api\"}",
+          "legendFormat": "goroutines",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
         "defaults": {"unit": "short"},
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Memory (RSS)",
+      "description": "Resident set size of the API process — how much physical memory it's actually holding. Compare to the host's available memory if this trends up over time.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "process_resident_memory_bytes{job=\"api\"}",
+          "legendFormat": "RSS",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "bytes"},
         "overrides": []
       }
     }

@@ -9,10 +9,160 @@
   "panels": [
     {
       "id": 1,
-      "type": "timeseries",
-      "title": "Chat turns / second",
+      "type": "stat",
+      "title": "Total turns (24h)",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(agent_turns_total[24h]))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "blue"}},
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Tokens in (24h)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(agent_tokens_total{direction=\"input\"}[24h]))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "purple"}},
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Tokens out (24h)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(agent_tokens_total{direction=\"output\"}[24h]))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "orange"}},
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Cache reads (24h)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(agent_tokens_total{direction=\"cache_read\"}[24h]))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 0, "color": {"mode": "fixed", "fixedColor": "green"}},
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Routing decisions over time (by tier)",
+      "description": "Rate of Haiku-tier vs Sonnet-tier classifications coming out of the model router. Stacks the two so you can read both the absolute rate and the split.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (tier) (rate(agent_routing_decisions_total[5m]))",
+          "legendFormat": "{{tier}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "piechart",
+      "title": "Tier split (24h)",
+      "description": "Share of turns routed to each tier in the last 24 hours. A skew toward 'complex' means routing is paying for Sonnet often — worth a look at the router's classifications if it feels wrong.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (tier) (increase(agent_routing_decisions_total[24h]))",
+          "legendFormat": "{{tier}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "pieType": "donut",
+        "tooltip": {"mode": "single"},
+        "legend": {"displayMode": "list", "placement": "right", "showLegend": true, "values": ["value", "percent"]}
+      },
+      "fieldConfig": {
+        "defaults": {"unit": "short"},
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Chat turn rate (per second)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -27,11 +177,11 @@
       }
     },
     {
-      "id": 2,
+      "id": 8,
       "type": "timeseries",
       "title": "Chat latency (p50 / p95)",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -52,16 +202,17 @@
       }
     },
     {
-      "id": 3,
+      "id": 9,
       "type": "timeseries",
-      "title": "Agent error rate (5xx)",
+      "title": "Errors per tier (turns ending in error)",
+      "description": "Rate of turns whose completion_reason was 'error'. Broken down by tier so you can see if one model is failing disproportionately.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum(rate(http_requests_total{job=\"agent\", status=~\"5..\"}[5m]))",
-          "legendFormat": "5xx",
+          "expr": "sum by (tier) (rate(agent_turns_total{completion_reason=\"error\"}[5m]))",
+          "legendFormat": "{{tier}}",
           "refId": "A"
         }
       ],
@@ -71,27 +222,92 @@
       }
     },
     {
-      "id": 4,
-      "type": "stat",
-      "title": "Total chat turns (last 24h)",
+      "id": 10,
+      "type": "timeseries",
+      "title": "Tool calls / sec (by tool)",
+      "description": "Rate at which the agent is invoking each MCP tool. Stacked so you can read both total rate and per-tool share at a glance — most-called tools are likely where to invest in quality / speed.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "sum(increase(http_requests_total{job=\"agent\", handler=\"/chat\"}[24h]))",
-          "legendFormat": "/chat",
+          "expr": "sum by (tool_name) (rate(agent_tool_calls_total[5m]))",
+          "legendFormat": "{{tool_name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "Top tools (last 24h)",
+      "description": "Leaderboard of MCP tools by total invocations over the last 24 hours.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "topk(10, sum by (tool_name) (increase(agent_tool_calls_total[24h])))",
+          "legendFormat": "{{tool_name}}",
           "refId": "A",
           "instant": true
         }
       ],
       "options": {
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
-        "textMode": "value",
-        "colorMode": "value"
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
       },
       "fieldConfig": {
-        "defaults": {"unit": "short"},
+        "defaults": {"unit": "short", "decimals": 0},
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Tool call latency p95 (by tool)",
+      "description": "Per-tool 95th percentile invocation duration. A slow tool here translates to slow chat — the user is waiting on this hop while the agent loops.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 36},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (tool_name, le) (rate(agent_tool_call_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{tool_name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "s"},
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Tool errors / sec (by tool)",
+      "description": "Rate of tool calls whose MCP response signaled an error. A tool error doesn't necessarily fail the chat turn — the agent often retries or works around it — but a non-zero rate here usually points at a broken tool or a model that's calling it wrong.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 36},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (tool_name) (rate(agent_tool_calls_total{outcome=\"error\"}[5m]))",
+          "legendFormat": "{{tool_name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "reqps"},
         "overrides": []
       }
     }
