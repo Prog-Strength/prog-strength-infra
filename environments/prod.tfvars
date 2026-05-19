@@ -40,7 +40,14 @@ compute = {
   ami_name_pattern = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"
   ami_owner        = "099720109477"
   ssh_key_name     = "prog-strength-backend-prod-keys"
-  root_volume_size = 8
+  # Disk usage at steady state is roughly:
+  #   Docker images       ~3 GB   (Grafana alone is ~900 MB)
+  #   Build cache         ~1.5 GB (Go builds; grows back after every deploy)
+  #   Ubuntu base + logs  ~1.2 GB
+  #   SQLite + Prom data  ~250 MB
+  # 20 GB gives ~14 GB headroom — comfortable for years of beta scale
+  # without absorbing every build/cache spike into an alert.
+  root_volume_size = 20
   security_group = {
     ingress_rules = [
       {
