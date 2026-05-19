@@ -41,3 +41,25 @@ agent.progstrength.fitness {
 	import block_internal
 	reverse_proxy agent:8001
 }
+
+# Public HTTPS endpoint for the Grafana monitoring dashboards.
+#
+# Named monitoring.* rather than grafana.* so the URL describes
+# intent — if we ever swap Grafana for something else, the public
+# URL stays meaningful and bookmarks don't break.
+#
+# Auth is Grafana's built-in username/password (admin user
+# overridden via GF_SECURITY_ADMIN_USER and a strong password set
+# via GF_SECURITY_ADMIN_PASSWORD — both seeded from GitHub
+# repository secrets in the API deploy workflow). The 127.0.0.1:3000
+# host binding stays as a tunnel fallback for when Caddy or DNS
+# is in a bad state.
+#
+# import block_internal is defensive — Grafana doesn't expose
+# /internal/ routes, but the snippet also blocks /metrics, which
+# Grafana DOES serve (for its own self-scrape). We don't need that
+# public; Prometheus already scrapes it over the docker network.
+monitoring.progstrength.fitness {
+	import block_internal
+	reverse_proxy grafana:3000
+}

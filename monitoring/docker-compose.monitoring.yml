@@ -57,14 +57,26 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     environment:
-      # Default admin password. Change it via the Grafana UI on first
-      # login; this env var only seeds the initial value.
+      # Admin credentials. Both seed the initial values on first
+      # boot; subsequent changes via the Grafana UI persist in
+      # grafana_data (the SQLite-backed config store). The deploy
+      # workflow injects both from GitHub repository secrets, falling
+      # back to "admin" only when neither is set (local dev).
+      #
+      # Override the username (default is "admin") so brute-force
+      # attempts against the public monitoring.* URL can't even
+      # rely on a known account name.
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       # Default install disables anonymous access — only the admin
       # account (and any others created in the UI) can read dashboards.
       - GF_AUTH_ANONYMOUS_ENABLED=false
+      # Grafana's built-in signup is disabled defensively. Even though
+      # the default is off, public exposure means it's worth pinning.
+      - GF_USERS_ALLOW_SIGN_UP=false
       # Skip Grafana's "you should change your password" nag on first
-      # login. The SSH-tunnel-only access path is the real boundary.
+      # login. The deploy seeds a strong password from secrets; the
+      # nag would just be noise on a single-user beta.
       - GF_SECURITY_DISABLE_INITIAL_ADMIN_PASSWORD_CHANGE=true
     volumes:
       # Provisioning auto-creates the Prometheus datasource and
