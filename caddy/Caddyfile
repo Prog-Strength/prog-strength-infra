@@ -9,15 +9,35 @@
 # lands on EC2, is a one-block addition. If the frontend goes on Vercel
 # or similar, point the apex DNS record there instead and leave this file
 # alone.
+#
+# Internal-only paths are blocked uniformly on every vhost via the
+# (block_internal) snippet below. The data path is:
+#
+#   - /internal/*  — written to by the FastAPI agent over the in-docker
+#                    network; never reachable by browsers/curl.
+#   - /metrics     — scraped by Prometheus over the in-docker network;
+#                    not for public exposure.
+#
+# Caddy responds 404 on those paths so they look like routes that
+# simply don't exist on the public surface, rather than 403'ing and
+# advertising that something is there to find.
+
+(block_internal) {
+	@internal path /internal/* /metrics
+	respond @internal 404
+}
 
 api.progstrength.fitness {
+	import block_internal
 	reverse_proxy api:8080
 }
 
 mcp.progstrength.fitness {
+	import block_internal
 	reverse_proxy mcp:8000
 }
 
 agent.progstrength.fitness {
+	import block_internal
 	reverse_proxy agent:8001
 }
