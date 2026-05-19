@@ -64,10 +64,7 @@ variable "compute" {
       }))
     })
     bootstrap = object({
-      api_repo_url   = string
       infra_repo_url = string
-      mcp_repo_url   = string
-      agent_repo_url = string
     })
   })
   default = {
@@ -80,10 +77,7 @@ variable "compute" {
       ingress_rules = []
     }
     bootstrap = {
-      api_repo_url   = "https://github.com/Prog-Strength/prog-strength-api.git"
       infra_repo_url = "https://github.com/Prog-Strength/prog-strength-infra.git"
-      mcp_repo_url   = "https://github.com/Prog-Strength/prog-strength-mcp.git"
-      agent_repo_url = "https://github.com/Prog-Strength/prog-strength-agent.git"
     }
   }
 }
