@@ -1,0 +1,85 @@
+# Manually re-provision the EC2 host that runs the prog-strength
+# backend. Useful for picking up a new AMI publish, recycling a host
+# that's misbehaving for whatever reason, or testing the disaster-
+# recovery path end-to-end (Litestream restore of app.db on first
+# boot, EIP re-association, bootstrap.sh + docker compose up).
+#
+# Triggered manually only. The confirmation input gate is the
+# safety against an accidental click — the workflow refuses to do
+# anything unless the input is the exact string "REPLACE".
+#
+# What this destroys vs preserves:
+#   - Destroys: the running EC2 + its root EBS volume. That means
+#     telemetry.db, Grafana's own SQLite state, the Prometheus TSDB,
+#     and container logs all reset.
+#   - Preserves: the Elastic IP (re-attaches automatically), the
+#     security group, the VPC. app.db comes back via Litestream
+#     restore as soon as the new instance runs docker compose up.
+#
+# Tunables / parameters: none deliberately. The only thing this
+# workflow can do is replace `module.compute.aws_instance.api`.
+# Anything broader belongs in the regular apply pipeline.
+
+name: Replace EC2 Instance
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type REPLACE to confirm. This destroys the running EC2 and its root volume. Only app.db survives (via Litestream).'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Same concurrency group as the regular apply workflow so the two
+# can't race against each other on the state file. A normal `terraform
+# apply` on a merge to main will queue behind a replace and vice
+# versa; never both at once.
+concurrency:
+  group: terraform-apply-prod
+  cancel-in-progress: false
+
+jobs:
+  replace:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate confirmation input
+        # Fail fast if the operator didn't type REPLACE. This runs
+        # before checkout / auth / anything that could leak, so a
+        # stray dispatch is a no-op and the next step never runs.
+        run: |
+          if [ "${{ inputs.confirm }}" != "REPLACE" ]; then
+            echo "::error::Confirmation must be exactly 'REPLACE' (case-sensitive). Got: ${{ inputs.confirm }}"
+            exit 1
+          fi
+          echo "Confirmation accepted. Proceeding with instance replacement."
+
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.0
+
+      - run: terraform init
+
+      # Plan separately so the GitHub Actions log shows exactly what
+      # the replace is about to do (destroy + create) before pulling
+      # the trigger. The plan file is then consumed by apply so what
+      # ran can't drift from what was shown.
+      - name: Terraform plan with -replace
+        run: |
+          terraform plan \
+            -var-file=environments/prod.tfvars \
+            -replace="module.compute.aws_instance.api" \
+            -out=replace.tfplan
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve replace.tfplan
