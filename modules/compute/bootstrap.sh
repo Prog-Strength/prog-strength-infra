@@ -20,12 +20,31 @@ apt-get upgrade -y
 # --- Host operator tooling --------------------------------------------------
 #
 # sqlite3 CLI for ad-hoc inspection of the api's database at
-# /home/ubuntu/prog-strength-api/data/app.db. The api itself doesn't need
-# this — go-sqlite3 is statically linked into the binary — but having the
-# CLI on the host means an SSH'd operator can run `sqlite3 -readonly ...`
-# without first apt-installing anything.
+# /home/ubuntu/prog-strength-infra/compose/api/data/app.db. The api itself
+# doesn't need this — go-sqlite3 is statically linked into the binary —
+# but having the CLI on the host means an SSH'd operator can run
+# `sqlite3 -readonly ...` without first apt-installing anything.
 
 apt-get install -y sqlite3
+
+# AWS CLI v2 for ECR login at deploy time. The deploy workflows SSH in
+# and run `aws ecr get-login-password | docker login ...` against the
+# host's instance role (no static creds), so awscli must be present
+# system-wide for the ubuntu user's shell. Installed via the official
+# bundle rather than apt — apt ships v1, and the v2 bundle is what AWS
+# documents and supports going forward.
+arch="$(dpkg --print-architecture)"
+case "$arch" in
+    arm64) aws_arch=aarch64 ;;
+    amd64) aws_arch=x86_64  ;;
+    *) echo "awscli: unsupported arch $arch"; exit 1 ;;
+esac
+curl -fsSL -o /tmp/awscliv2.zip \
+    "https://awscli.amazonaws.com/awscli-exe-linux-$${aws_arch}.zip"
+apt-get install -y unzip
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/awscliv2.zip /tmp/aws
 
 # --- Docker Engine + Compose v2 ---------------------------------------------
 #
@@ -39,31 +58,29 @@ curl -fsSL https://get.docker.com | sh
 # as ubuntu and calls `docker compose ...` directly, so this is required.
 usermod -aG docker ubuntu
 
-# --- Clone application + infra repos ----------------------------------------
+# --- Clone the infra repo ---------------------------------------------------
 #
-# All repos are public, so no credentials are needed. Clones run as the
-# ubuntu user so the working trees aren't root-owned (which would block
-# the deploy workflows' `git pull` / `git checkout` over SSH).
+# Service images are built and pushed to ECR by each service's GitHub
+# Actions workflow — the host only needs orchestration manifests, not
+# source code. All compose files, Caddyfile, Prometheus/Grafana config,
+# and litestream.yml now live under prog-strength-infra/compose/ and
+# friends, so this single clone is everything the host needs to operate.
 #
-# Directory layout matches what the deploy workflows SSH into:
-#   /home/ubuntu/prog-strength-api    — api repo (release.yml)
-#   /home/ubuntu/prog-strength-infra  — infra repo (deploy-caddy.yml)
-#   /home/ubuntu/prog-strength-mcp    — mcp repo (deploy.yml)
-#   /home/ubuntu/prog-strength-agent  — agent repo (deploy.yml)
+# Public repo, so no credentials are required. Clone as the ubuntu user
+# so the working tree isn't root-owned (which would block the deploy
+# workflows' `git pull` over SSH).
 
-sudo -u ubuntu git clone "${api_repo_url}" /home/ubuntu/prog-strength-api
 sudo -u ubuntu git clone "${infra_repo_url}" /home/ubuntu/prog-strength-infra
-sudo -u ubuntu git clone "${mcp_repo_url}" /home/ubuntu/prog-strength-mcp
-sudo -u ubuntu git clone "${agent_repo_url}" /home/ubuntu/prog-strength-agent
 
-# SQLite data dir. docker-compose.yml bind-mounts `./data:/data` from the
-# api working dir, so pre-creating it avoids the volume being root-owned
-# the first time docker creates it implicitly.
-sudo -u ubuntu mkdir -p /home/ubuntu/prog-strength-api/data
+# SQLite data dir. The api compose file bind-mounts `./data:/data` from
+# compose/api/, so pre-creating it avoids the volume being root-owned the
+# first time docker creates it implicitly. Litestream's restore service
+# will populate app.db from S3 on first boot if a replica exists.
+sudo -u ubuntu mkdir -p /home/ubuntu/prog-strength-infra/compose/api/data
 
-# Shared docker network used by all services on this host. Both the api
-# and mcp compose files declare it as `external: true` so they don't try
-# to create or destroy it themselves — its lifecycle belongs here.
+# Shared docker network. All three service stacks (api, mcp, agent)
+# declare it as `external: true` so they don't try to create or destroy
+# it themselves — its lifecycle belongs here.
 docker network create prog-strength 2>/dev/null || true
 
 # --- fastfetch (login banner) -----------------------------------------------

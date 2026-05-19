@@ -74,12 +74,10 @@ compute = {
     ]
   }
   bootstrap = {
-    # Repos cloned by user_data on first boot. All must be public (or the
-    # instance role / a deploy key would need to be set up here).
-    api_repo_url   = "https://github.com/Prog-Strength/prog-strength-api.git"
+    # Only the infra repo is cloned on first boot — it owns all
+    # orchestration manifests (compose files, Caddyfile, monitoring
+    # config, litestream.yml). Service images come from ECR.
     infra_repo_url = "https://github.com/Prog-Strength/prog-strength-infra.git"
-    mcp_repo_url   = "https://github.com/Prog-Strength/prog-strength-mcp.git"
-    agent_repo_url = "https://github.com/Prog-Strength/prog-strength-agent.git"
   }
 }
 

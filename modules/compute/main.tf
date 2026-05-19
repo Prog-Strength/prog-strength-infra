@@ -26,15 +26,12 @@ resource "aws_instance" "api" {
   associate_public_ip_address = false
   iam_instance_profile        = aws_iam_instance_profile.api.name
 
-  # First-boot setup: installs Docker, clones the api + infra repos, prepares
-  # the SQLite data dir. See bootstrap.sh for details. The script only runs
-  # on a *new* instance — `ignore_changes` below keeps edits from triggering
-  # a replacement that would wipe the SQLite DB on the existing host.
+  # First-boot setup: installs Docker + awscli, clones the infra repo, and
+  # prepares the SQLite data dir. See bootstrap.sh for details. The script
+  # only runs on a *new* instance — `ignore_changes` below keeps edits
+  # from triggering a replacement that would wipe the SQLite DB.
   user_data = templatefile("${path.module}/bootstrap.sh", {
-    api_repo_url   = var.bootstrap.api_repo_url
     infra_repo_url = var.bootstrap.infra_repo_url
-    mcp_repo_url   = var.bootstrap.mcp_repo_url
-    agent_repo_url = var.bootstrap.agent_repo_url
   })
 
   metadata_options {

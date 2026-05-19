@@ -31,11 +31,8 @@ variable "root_volume_size" {
 }
 
 variable "bootstrap" {
-  description = "Repos cloned into the EC2 host by user_data on first boot. All must be reachable without auth from the instance."
+  description = "Infra repo cloned into the EC2 host by user_data on first boot. Service images come from ECR; only orchestration manifests (compose, caddy, monitoring) need to be present on disk."
   type = object({
-    api_repo_url   = string
     infra_repo_url = string
-    mcp_repo_url   = string
-    agent_repo_url = string
   })
 }
