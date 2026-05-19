@@ -37,3 +37,12 @@ module "compute" {
   bootstrap                 = var.compute.bootstrap
   iam_instance_profile_name = module.backup.instance_profile_name
 }
+
+module "ecr" {
+  source = "./modules/ecr"
+
+  name_prefix                = local.name_prefix
+  repository_names           = var.ecr.repository_names
+  max_image_count            = var.ecr.max_image_count
+  untagged_image_expire_days = var.ecr.untagged_image_expire_days
+}
