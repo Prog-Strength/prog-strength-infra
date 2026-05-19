@@ -68,29 +68,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "litestream" {
   }
 }
 
-# --- IAM: role assumable by EC2, policy scoped to this bucket only ----------
+# --- IAM: policy scoped to the Litestream bucket, attached to the EC2 role --
 #
 # Litestream's S3 backend uses the AWS SDK default credential chain, which
 # picks up the instance role automatically when running on EC2. The role
-# is intentionally narrow — it can read/write only the litestream bucket,
-# nothing else.
-
-data "aws_iam_policy_document" "assume_role" {
-  statement {
-    effect  = "Allow"
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["ec2.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "api_instance" {
-  name               = "${var.name_prefix}-api-instance"
-  assume_role_policy = data.aws_iam_policy_document.assume_role.json
-}
+# itself is owned by the compute module — we just author the policy here
+# (so it stays tightly scoped to this bucket) and attach it.
 
 data "aws_iam_policy_document" "litestream" {
   # Bucket-level: Litestream lists generations to decide what to write/restore.
@@ -119,11 +102,6 @@ resource "aws_iam_policy" "litestream" {
 }
 
 resource "aws_iam_role_policy_attachment" "litestream" {
-  role       = aws_iam_role.api_instance.name
+  role       = var.instance_role_name
   policy_arn = aws_iam_policy.litestream.arn
-}
-
-resource "aws_iam_instance_profile" "api" {
-  name = "${var.name_prefix}-api-instance"
-  role = aws_iam_role.api_instance.name
 }

@@ -82,3 +82,17 @@ compute = {
     agent_repo_url = "https://github.com/Prog-Strength/prog-strength-agent.git"
   }
 }
+
+# --- ECR (image registry for GitHub Actions-built service images) -----------
+
+ecr = {
+  # One repository per service. Each lands at
+  # <project>-<env>/<name> in ECR (e.g. prog-strength-prod/api).
+  repository_names = ["api", "mcp", "agent"]
+  # Tagged-image retention. ~10 versions covers a few months of
+  # rollback at the project's release cadence; bump if longer
+  # rollback history starts to matter.
+  max_image_count = 10
+  # Untagged images are build leftovers — short retention is fine.
+  untagged_image_expire_days = 1
+}

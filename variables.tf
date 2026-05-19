@@ -87,3 +87,17 @@ variable "compute" {
     }
   }
 }
+
+variable "ecr" {
+  description = "ECR repositories that hold images built by GitHub Actions and pulled by the EC2 host at deploy time. One repo per service so lifecycle policies and tag immutability scope correctly per image."
+  type = object({
+    repository_names           = list(string)
+    max_image_count            = number
+    untagged_image_expire_days = number
+  })
+  default = {
+    repository_names           = ["api", "mcp", "agent"]
+    max_image_count            = 10
+    untagged_image_expire_days = 1
+  }
+}
