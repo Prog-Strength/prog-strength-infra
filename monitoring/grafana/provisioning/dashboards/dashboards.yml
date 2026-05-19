@@ -1,0 +1,22 @@
+# Auto-load every JSON dashboard from
+# /var/lib/grafana/dashboards/ at startup. Dashboards are mounted
+# read-only from prog-strength-infra/monitoring/grafana/dashboards/,
+# so iterating on a dashboard means editing the JSON and pushing —
+# UI edits won't persist across restarts.
+#
+# To work on a dashboard in the UI: change `editable` to true here
+# temporarily, edit in Grafana, then "Export JSON" and check the
+# result back into the dashboards/ directory.
+
+apiVersion: 1
+
+providers:
+  - name: prog-strength
+    folder: ""
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
