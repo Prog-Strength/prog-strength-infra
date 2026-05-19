@@ -19,3 +19,8 @@ variable "untagged_image_expire_days" {
   type        = number
   default     = 1
 }
+
+variable "instance_role_name" {
+  description = "Name of the IAM role attached to the EC2 instance, owned by the compute module. This module attaches AWS-managed AmazonEC2ContainerRegistryReadOnly to it so docker compose on the host can pull images from these repositories."
+  type        = string
+}

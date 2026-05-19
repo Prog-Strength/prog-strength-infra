@@ -1,5 +1,10 @@
 variable "name_prefix" {
-  description = "Prefix applied to IAM role / policy / instance profile names so they're identifiable in the AWS console alongside the rest of the stack."
+  description = "Prefix applied to IAM policy names so they're identifiable in the AWS console alongside the rest of the stack."
+  type        = string
+}
+
+variable "instance_role_name" {
+  description = "Name of the IAM role attached to the EC2 instance, owned by the compute module. This module attaches the Litestream S3 access policy to it."
   type        = string
 }
 

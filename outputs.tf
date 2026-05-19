@@ -29,5 +29,5 @@ output "litestream_bucket_name" {
 
 output "api_instance_profile_name" {
   description = "Instance profile attached to the API EC2 instance. Listed for visibility; not needed at deploy time."
-  value       = module.backup.instance_profile_name
+  value       = module.compute.instance_profile_name
 }

@@ -40,6 +40,21 @@ resource "aws_ecr_repository" "this" {
   }
 }
 
+# Attach the AWS-managed ECR pull policy to the EC2 instance role so
+# `docker compose pull` on the host works without static credentials.
+# The role itself is owned by the compute module; we just hang this
+# permission off it here, keeping the ECR concern self-contained.
+#
+# Scoped account-wide rather than to specific repo ARNs because at
+# single-account / single-environment scale the difference is
+# theoretical — the only ECR repos in the account are ours. Tighten
+# to an inline policy scoped to aws_ecr_repository.this[*].arn if a
+# future environment ever shares this account.
+resource "aws_iam_role_policy_attachment" "instance_ecr_pull" {
+  role       = var.instance_role_name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
 # Per-repository lifecycle policy. Two rules:
 #   1) Untagged images expire after a day. These appear when a build
 #      pushes a new layer that's then superseded — CI noise that adds
