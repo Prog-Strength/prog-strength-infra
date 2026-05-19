@@ -220,6 +220,96 @@
         "defaults": {"unit": "reqps"},
         "overrides": []
       }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Tool calls / sec (by tool)",
+      "description": "Rate at which the agent is invoking each MCP tool. Stacked so you can read both total rate and per-tool share at a glance — most-called tools are likely where to invest in quality / speed.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (tool_name) (rate(agent_tool_calls_total[5m]))",
+          "legendFormat": "{{tool_name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "bargauge",
+      "title": "Top tools (last 24h)",
+      "description": "Leaderboard of MCP tools by total invocations over the last 24 hours.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "topk(10, sum by (tool_name) (increase(agent_tool_calls_total[24h])))",
+          "legendFormat": "{{tool_name}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      },
+      "fieldConfig": {
+        "defaults": {"unit": "short", "decimals": 0},
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Tool call latency p95 (by tool)",
+      "description": "Per-tool 95th percentile invocation duration. A slow tool here translates to slow chat — the user is waiting on this hop while the agent loops.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 36},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (tool_name, le) (rate(agent_tool_call_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{tool_name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "s"},
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Tool errors / sec (by tool)",
+      "description": "Rate of tool calls whose MCP response signaled an error. A tool error doesn't necessarily fail the chat turn — the agent often retries or works around it — but a non-zero rate here usually points at a broken tool or a model that's calling it wrong.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 36},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (tool_name) (rate(agent_tool_calls_total{outcome=\"error\"}[5m]))",
+          "legendFormat": "{{tool_name}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "reqps"},
+        "overrides": []
+      }
     }
   ]
 }
