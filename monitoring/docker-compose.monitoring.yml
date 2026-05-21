@@ -51,9 +51,12 @@ services:
 
   grafana:
     image: grafana/grafana:12.2.1
-    # Bound to 127.0.0.1 only — Grafana is reachable via SSH tunnel
-    # (`ssh -L 3000:127.0.0.1:3000 host`) and never directly from the
-    # public internet. No Caddy vhost, no external auth integration.
+    # Reverse-proxied at https://monitoring.progstrength.fitness by
+    # Caddy (vhost lives in prog-strength-infra/caddy/Caddyfile),
+    # gated by Grafana's built-in admin login. The loopback bind below
+    # stays for the SSH-tunnel fallback
+    # (`ssh -L 3000:127.0.0.1:3000 host`) — the path of least
+    # resistance when Caddy or DNS is in a bad state.
     ports:
       - "127.0.0.1:3000:3000"
     environment:
