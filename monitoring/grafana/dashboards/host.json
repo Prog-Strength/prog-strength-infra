@@ -163,7 +163,21 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "percent", "min": 0, "max": 100},
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "transparent", "value": null},
+              {"color": "red", "value": 85}
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {"mode": "line"}
+          }
+        },
         "overrides": []
       }
     },
@@ -182,7 +196,21 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "percent", "min": 0, "max": 100},
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "transparent", "value": null},
+              {"color": "red", "value": 90}
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {"mode": "line"}
+          }
+        },
         "overrides": []
       }
     },
@@ -201,7 +229,21 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "percent", "min": 0, "max": 100},
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "transparent", "value": null},
+              {"color": "red", "value": 90}
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {"mode": "line"}
+          }
+        },
         "overrides": []
       }
     },
