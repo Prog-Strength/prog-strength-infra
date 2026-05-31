@@ -167,7 +167,7 @@
       "id": 6,
       "type": "timeseries",
       "title": "Server-side latency percentiles (p50 / p95 / p99)",
-      "description": "Measured inside the server handler — excludes the client⇄server network round-trip and TLS handshake. Overall request latency across every route. Use the per-route variants by clicking 'Edit' on this panel and adding a label filter, or drill down via 5xx rate by route if the cause of a spike is unclear.",
+      "description": "Measured inside the server handler — excludes the client⇄server network round-trip and TLS handshake. Overall request latency across every route. Use the per-route variants by clicking 'Edit' on this panel and adding a label filter, or drill down via 5xx rate by route if the cause of a spike is unclear. Dashed yellow / red lines mark the warning and critical thresholds.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
       "targets": [
@@ -188,24 +188,42 @@
           "expr": "histogram_quantile(0.99, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
           "legendFormat": "p99",
           "refId": "C"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(0.5)",
+          "legendFormat": "warning (500ms)",
+          "refId": "D"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(1)",
+          "legendFormat": "critical (1s)",
+          "refId": "E"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 0.5},
-              {"color": "red", "value": 1}
+          "min": 0,
+          "softMax": 1.2
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (500ms)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
             ]
           },
-          "custom": {
-            "thresholdsStyle": {"mode": "line"}
+          {
+            "matcher": {"id": "byName", "options": "critical (1s)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
           }
-        },
-        "overrides": []
+        ]
       }
     },
     {
