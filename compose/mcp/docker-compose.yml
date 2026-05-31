@@ -26,10 +26,16 @@ services:
     # Ship stdout/stderr to CloudWatch Logs via Docker's built-in
     # awslogs driver. Log group is pre-created by the Terraform
     # `logging` module; see prog-strength-docs/sows/cloudwatch-logs.md.
+    # AWS_REGION is REQUIRED — see the agent compose for the full
+    # reasoning, but short version: a missing AWS_REGION silently
+    # falls back to us-east-1, which doesn't match Terraform's
+    # us-east-2 log groups, which means CreateLogStream 403s and the
+    # container fails to start. Better to fail at `docker compose
+    # up` time with a clear message.
     logging:
       driver: awslogs
       options:
-        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-region: "${AWS_REGION:?AWS_REGION must be set; awslogs region must match the Terraform log-group region}"
         awslogs-group: /prog-strength/mcp
         awslogs-create-stream: "true"
 

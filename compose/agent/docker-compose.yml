@@ -72,14 +72,18 @@ services:
     # drop logs:CreateLogGroup for least-privilege. See
     # prog-strength-docs/sows/cloudwatch-logs.md.
     #
-    # AWS_REGION is forwarded from .env (written by the deploy
-    # workflow); a region must be set or the driver fails to start
-    # the container. The us-east-1 fallback exists for local
-    # `docker compose up` against a developer's account.
+    # AWS_REGION is REQUIRED — the driver region has to match the
+    # region the Terraform log groups + IAM policy were created in
+    # (typically us-east-2). The `${VAR:?message}` syntax makes
+    # `docker compose up` fail fast with that message instead of
+    # silently defaulting to us-east-1 and 403'ing on CreateLogStream
+    # against a log group that doesn't exist in that region — an
+    # earlier "fall back to us-east-1" default was bitten by exactly
+    # this in prod.
     logging:
       driver: awslogs
       options:
-        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-region: "${AWS_REGION:?AWS_REGION must be set; awslogs region must match the Terraform log-group region}"
         awslogs-group: /prog-strength/agent
         awslogs-create-stream: "true"
 
