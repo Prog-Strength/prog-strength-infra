@@ -72,7 +72,7 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "p95 latency (now)",
+      "title": "p95 server-side latency (now)",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
       "targets": [
@@ -90,14 +90,25 @@
         "graphMode": "area"
       },
       "fieldConfig": {
-        "defaults": {"unit": "s", "decimals": 3, "color": {"mode": "fixed", "fixedColor": "orange"}},
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.5},
+              {"color": "red", "value": 1}
+            ]
+          }
+        },
         "overrides": []
       }
     },
     {
       "id": 4,
       "type": "stat",
-      "title": "p99 latency (now)",
+      "title": "p99 server-side latency (now)",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
       "targets": [
@@ -115,7 +126,18 @@
         "graphMode": "area"
       },
       "fieldConfig": {
-        "defaults": {"unit": "s", "decimals": 3, "color": {"mode": "fixed", "fixedColor": "red"}},
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 2}
+            ]
+          }
+        },
         "overrides": []
       }
     },
@@ -144,8 +166,8 @@
     {
       "id": 6,
       "type": "timeseries",
-      "title": "Latency percentiles (p50 / p95 / p99)",
-      "description": "Overall request latency across every route. Use the per-route variants by clicking 'Edit' on this panel and adding a label filter, or drill down via 5xx rate by route if the cause of a spike is unclear.",
+      "title": "Server-side latency percentiles (p50 / p95 / p99)",
+      "description": "Measured inside the server handler — excludes the client⇄server network round-trip and TLS handshake. Overall request latency across every route. Use the per-route variants by clicking 'Edit' on this panel and adding a label filter, or drill down via 5xx rate by route if the cause of a spike is unclear.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
       "targets": [
@@ -169,7 +191,20 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "s"},
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.5},
+              {"color": "red", "value": 1}
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {"mode": "line"}
+          }
+        },
         "overrides": []
       }
     },
@@ -189,7 +224,20 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "reqps"},
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.05},
+              {"color": "red", "value": 0.2}
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {"mode": "line"}
+          }
+        },
         "overrides": []
       }
     },
@@ -236,7 +284,20 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "short"},
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 75},
+              {"color": "red", "value": 100}
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {"mode": "line"}
+          }
+        },
         "overrides": []
       }
     },
@@ -256,7 +317,20 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "bytes"},
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 268435456},
+              {"color": "red", "value": 536870912}
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {"mode": "line"}
+          }
+        },
         "overrides": []
       }
     }

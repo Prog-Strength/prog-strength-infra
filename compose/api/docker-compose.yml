@@ -69,10 +69,15 @@ services:
     # want to double the ingestion bill for output that's only
     # useful while SSH'd to the host. See
     # prog-strength-docs/sows/cloudwatch-logs.md.
+    # AWS_REGION is REQUIRED — see the agent compose for the full
+    # reasoning. Short version: missing AWS_REGION silently falls
+    # back to us-east-1, which doesn't match Terraform's us-east-2
+    # log groups, leading to CreateLogStream 403s at container
+    # start. Fail fast at compose-up time instead.
     logging:
       driver: awslogs
       options:
-        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-region: "${AWS_REGION:?AWS_REGION must be set; awslogs region must match the Terraform log-group region}"
         awslogs-group: /prog-strength/api
         awslogs-create-stream: "true"
 
