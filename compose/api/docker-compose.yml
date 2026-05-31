@@ -62,6 +62,19 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+    # Ship stdout/stderr to CloudWatch Logs via Docker's built-in
+    # awslogs driver. Only the api service ships — the restore +
+    # litestream sidecars and Caddy keep the default json-file
+    # driver, because their output is plumbing noise and we don't
+    # want to double the ingestion bill for output that's only
+    # useful while SSH'd to the host. See
+    # prog-strength-docs/sows/cloudwatch-logs.md.
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: /prog-strength/api
+        awslogs-create-stream: "true"
 
   # Long-running sidecar: streams WAL frames to S3 continuously. Shares
   # /data with the api container so it sees app.db and app.db-wal as the

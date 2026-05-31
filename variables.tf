@@ -95,3 +95,17 @@ variable "ecr" {
     untagged_image_expire_days = 1
   }
 }
+
+variable "logging" {
+  description = "CloudWatch Logs setup for the docker-compose service containers. service_names becomes one log group each (/prog-strength/<name>). retention_days bounds storage cost; monthly_budget_usd is the EstimatedCharges alarm threshold (set to 0 to skip the alarm). See prog-strength-docs/sows/cloudwatch-logs.md."
+  type = object({
+    service_names      = list(string)
+    retention_days     = number
+    monthly_budget_usd = number
+  })
+  default = {
+    service_names      = ["api", "agent", "mcp"]
+    retention_days     = 30
+    monthly_budget_usd = 5
+  }
+}

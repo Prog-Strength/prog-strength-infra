@@ -47,3 +47,13 @@ module "ecr" {
   untagged_image_expire_days = var.ecr.untagged_image_expire_days
   instance_role_name         = module.compute.instance_role_name
 }
+
+module "logging" {
+  source = "./modules/logging"
+
+  name_prefix        = local.name_prefix
+  instance_role_name = module.compute.instance_role_name
+  service_names      = var.logging.service_names
+  retention_days     = var.logging.retention_days
+  monthly_budget_usd = var.logging.monthly_budget_usd
+}
