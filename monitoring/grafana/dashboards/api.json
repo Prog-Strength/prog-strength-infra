@@ -323,7 +323,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "Memory (RSS)",
-      "description": "Resident set size of the API process — how much physical memory it's actually holding. Compare to the host's available memory if this trends up over time.",
+      "description": "Resident set size of the API process — how much physical memory it's actually holding. Compare to the host's available memory if this trends up over time. Dashed yellow / red lines mark the warning and critical thresholds.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
       "targets": [
@@ -332,24 +332,42 @@
           "expr": "process_resident_memory_bytes{job=\"api\"}",
           "legendFormat": "RSS",
           "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(268435456)",
+          "legendFormat": "warning (256 MiB)",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(536870912)",
+          "legendFormat": "critical (512 MiB)",
+          "refId": "C"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 268435456},
-              {"color": "red", "value": 536870912}
+          "min": 0,
+          "softMax": 629145600
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (256 MiB)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
             ]
           },
-          "custom": {
-            "thresholdsStyle": {"mode": "line"}
+          {
+            "matcher": {"id": "byName", "options": "critical (512 MiB)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
           }
-        },
-        "overrides": []
+        ]
       }
     }
   ]
