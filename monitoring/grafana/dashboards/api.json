@@ -167,7 +167,7 @@
       "id": 6,
       "type": "timeseries",
       "title": "Server-side latency percentiles (p50 / p95 / p99)",
-      "description": "Measured inside the server handler — excludes the client⇄server network round-trip and TLS handshake. Overall request latency across every route. Use the per-route variants by clicking 'Edit' on this panel and adding a label filter, or drill down via 5xx rate by route if the cause of a spike is unclear.",
+      "description": "Measured inside the server handler — excludes the client⇄server network round-trip and TLS handshake. Overall request latency across every route. Use the per-route variants by clicking 'Edit' on this panel and adding a label filter, or drill down via 5xx rate by route if the cause of a spike is unclear. Dashed yellow / red lines mark the warning and critical thresholds.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
       "targets": [
@@ -188,31 +188,49 @@
           "expr": "histogram_quantile(0.99, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
           "legendFormat": "p99",
           "refId": "C"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(0.5)",
+          "legendFormat": "warning (500ms)",
+          "refId": "D"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(1)",
+          "legendFormat": "critical (1s)",
+          "refId": "E"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 0.5},
-              {"color": "red", "value": 1}
+          "min": 0,
+          "softMax": 1.2
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (500ms)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
             ]
           },
-          "custom": {
-            "thresholdsStyle": {"mode": "line"}
+          {
+            "matcher": {"id": "byName", "options": "critical (1s)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
           }
-        },
-        "overrides": []
+        ]
       }
     },
     {
       "id": 7,
       "type": "timeseries",
       "title": "5xx rate by route",
-      "description": "Server-side errors broken out by route. A spike here usually points at a specific handler — start there, not at infra.",
+      "description": "Server-side errors broken out by route. A spike here usually points at a specific handler — start there, not at infra. Dashed yellow / red lines mark the warning and critical thresholds.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
       "targets": [
@@ -221,24 +239,42 @@
           "expr": "sum by (route) (rate(ps_http_requests_total{status=~\"5..\"}[5m]))",
           "legendFormat": "{{route}}",
           "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(0.05)",
+          "legendFormat": "warning (0.05/s)",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(0.2)",
+          "legendFormat": "critical (0.2/s)",
+          "refId": "C"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 0.05},
-              {"color": "red", "value": 0.2}
+          "min": 0,
+          "softMax": 0.25
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (0.05/s)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
             ]
           },
-          "custom": {
-            "thresholdsStyle": {"mode": "line"}
+          {
+            "matcher": {"id": "byName", "options": "critical (0.2/s)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
           }
-        },
-        "overrides": []
+        ]
       }
     },
     {
@@ -272,7 +308,7 @@
       "id": 9,
       "type": "timeseries",
       "title": "Goroutines",
-      "description": "Active goroutines inside the API process. Steady-state is small (~20-50); a slow climb usually means a leak — a request handler spawning goroutines that never exit.",
+      "description": "Active goroutines inside the API process. Steady-state is small (~20-50); a slow climb usually means a leak — a request handler spawning goroutines that never exit. Dashed yellow / red lines mark the warning and critical thresholds.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
       "targets": [
@@ -281,31 +317,49 @@
           "expr": "go_goroutines{job=\"api\"}",
           "legendFormat": "goroutines",
           "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(75)",
+          "legendFormat": "warning (75)",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(100)",
+          "legendFormat": "critical (100)",
+          "refId": "C"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 75},
-              {"color": "red", "value": 100}
+          "min": 0,
+          "softMax": 110
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (75)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
             ]
           },
-          "custom": {
-            "thresholdsStyle": {"mode": "line"}
+          {
+            "matcher": {"id": "byName", "options": "critical (100)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
           }
-        },
-        "overrides": []
+        ]
       }
     },
     {
       "id": 10,
       "type": "timeseries",
       "title": "Memory (RSS)",
-      "description": "Resident set size of the API process — how much physical memory it's actually holding. Compare to the host's available memory if this trends up over time.",
+      "description": "Resident set size of the API process — how much physical memory it's actually holding. Compare to the host's available memory if this trends up over time. Dashed yellow / red lines mark the warning and critical thresholds.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
       "targets": [
@@ -314,24 +368,42 @@
           "expr": "process_resident_memory_bytes{job=\"api\"}",
           "legendFormat": "RSS",
           "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(268435456)",
+          "legendFormat": "warning (256 MiB)",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(536870912)",
+          "legendFormat": "critical (512 MiB)",
+          "refId": "C"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 268435456},
-              {"color": "red", "value": 536870912}
+          "min": 0,
+          "softMax": 629145600
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (256 MiB)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
             ]
           },
-          "custom": {
-            "thresholdsStyle": {"mode": "line"}
+          {
+            "matcher": {"id": "byName", "options": "critical (512 MiB)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
           }
-        },
-        "overrides": []
+        ]
       }
     }
   ]
