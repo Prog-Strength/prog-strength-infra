@@ -212,7 +212,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "5xx rate by route",
-      "description": "Server-side errors broken out by route. A spike here usually points at a specific handler — start there, not at infra.",
+      "description": "Server-side errors broken out by route. A spike here usually points at a specific handler — start there, not at infra. Dashed yellow / red lines mark the warning and critical thresholds.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
       "targets": [
@@ -221,24 +221,42 @@
           "expr": "sum by (route) (rate(ps_http_requests_total{status=~\"5..\"}[5m]))",
           "legendFormat": "{{route}}",
           "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(0.05)",
+          "legendFormat": "warning (0.05/s)",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(0.2)",
+          "legendFormat": "critical (0.2/s)",
+          "refId": "C"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 0.05},
-              {"color": "red", "value": 0.2}
+          "min": 0,
+          "softMax": 0.25
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (0.05/s)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
             ]
           },
-          "custom": {
-            "thresholdsStyle": {"mode": "line"}
+          {
+            "matcher": {"id": "byName", "options": "critical (0.2/s)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
           }
-        },
-        "overrides": []
+        ]
       }
     },
     {
