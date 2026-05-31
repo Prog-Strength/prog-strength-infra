@@ -22,6 +22,16 @@ services:
       # Forwarded from .env, which the deploy workflow writes from
       # GitHub repository secrets on each release.
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # OPENAI_API_KEY is optional. Empty → /speak returns 503 at
+      # request time; the rest of the agent (chat + title) keeps
+      # working. See prog-strength-docs/sows/voice-chat.md.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # OpenAI TTS tunables. Override to flip voice or model without
+      # rebuilding the image — same shape as the Claude model envs
+      # above. Default voice is "onyx" per the voice-chat SOW.
+      - OPENAI_TTS_MODEL=${OPENAI_TTS_MODEL:-tts-1}
+      - TTS_VOICE_DEFAULT=${TTS_VOICE_DEFAULT:-onyx}
+      - TTS_DAILY_CHAR_CAP_PER_USER=${TTS_DAILY_CHAR_CAP_PER_USER:-50000}
       - JWT_SIGNING_KEY=${JWT_SIGNING_KEY}
       # Tiered model routing: simple/complex tiers + a classifier
       # router. The agent's ModelRouter picks one of the two response
