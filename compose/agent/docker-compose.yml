@@ -65,6 +65,23 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+    # Ship stdout/stderr to CloudWatch Logs via Docker's built-in
+    # awslogs driver — no sidecar process, no agent container, no
+    # on-disk log file management. The log group is pre-created by
+    # the Terraform `logging` module so the EC2 instance role can
+    # drop logs:CreateLogGroup for least-privilege. See
+    # prog-strength-docs/sows/cloudwatch-logs.md.
+    #
+    # AWS_REGION is forwarded from .env (written by the deploy
+    # workflow); a region must be set or the driver fails to start
+    # the container. The us-east-1 fallback exists for local
+    # `docker compose up` against a developer's account.
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: /prog-strength/agent
+        awslogs-create-stream: "true"
 
 # Join the shared network the api + mcp + caddy live on. `external: true`
 # means docker compose won't try to create or destroy it — the host owns

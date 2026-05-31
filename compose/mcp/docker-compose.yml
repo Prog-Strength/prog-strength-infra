@@ -23,6 +23,15 @@ services:
       # Defaults to "dev" for local `docker compose up` without a release.
       - APP_VERSION=${APP_VERSION:-dev}
     restart: unless-stopped
+    # Ship stdout/stderr to CloudWatch Logs via Docker's built-in
+    # awslogs driver. Log group is pre-created by the Terraform
+    # `logging` module; see prog-strength-docs/sows/cloudwatch-logs.md.
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-us-east-1}
+        awslogs-group: /prog-strength/mcp
+        awslogs-create-stream: "true"
 
 # Join the shared network the api + caddy live on. `external: true` means
 # docker compose won't try to create or destroy it — the host owns its
