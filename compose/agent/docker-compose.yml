@@ -26,12 +26,23 @@ services:
       # request time; the rest of the agent (chat + title) keeps
       # working. See prog-strength-docs/sows/voice-chat.md.
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      # OpenAI TTS tunables. Override to flip voice or model without
-      # rebuilding the image — same shape as the Claude model envs
-      # above. Default voice is "onyx" per the voice-chat SOW.
-      - OPENAI_TTS_MODEL=${OPENAI_TTS_MODEL:-tts-1}
-      - TTS_VOICE_DEFAULT=${TTS_VOICE_DEFAULT:-onyx}
+      # OpenAI TTS tunables. Override to flip voice / model / vibe
+      # without rebuilding the image — same shape as the Claude model
+      # envs above. gpt-4o-mini-tts is the current default because
+      # the "cedar" voice is only available there (not on tts-1) and
+      # the model also accepts the `instructions` string we use to
+      # carry the Prog Strength coach personality + pacing cue.
+      - OPENAI_TTS_MODEL=${OPENAI_TTS_MODEL:-gpt-4o-mini-tts}
+      - TTS_VOICE_DEFAULT=${TTS_VOICE_DEFAULT:-cedar}
       - TTS_DAILY_CHAR_CAP_PER_USER=${TTS_DAILY_CHAR_CAP_PER_USER:-50000}
+      # Optional ops override for the TTS personality / pacing cue.
+      # Intentionally written without `=` so an unset host env stays
+      # unset inside the container — that lets the Python default in
+      # config.py (the fitness-coach personality string) take effect.
+      # Writing `${TTS_INSTRUCTIONS:-}` instead would silently set
+      # the var to empty, blocking the Python default from ever
+      # firing.
+      - TTS_INSTRUCTIONS
       - JWT_SIGNING_KEY=${JWT_SIGNING_KEY}
       # Tiered model routing: simple/complex tiers + a classifier
       # router. The agent's ModelRouter picks one of the two response
