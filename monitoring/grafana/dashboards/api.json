@@ -272,7 +272,7 @@
       "id": 9,
       "type": "timeseries",
       "title": "Goroutines",
-      "description": "Active goroutines inside the API process. Steady-state is small (~20-50); a slow climb usually means a leak — a request handler spawning goroutines that never exit.",
+      "description": "Active goroutines inside the API process. Steady-state is small (~20-50); a slow climb usually means a leak — a request handler spawning goroutines that never exit. Dashed yellow / red lines mark the warning and critical thresholds.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
       "targets": [
@@ -281,24 +281,42 @@
           "expr": "go_goroutines{job=\"api\"}",
           "legendFormat": "goroutines",
           "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(75)",
+          "legendFormat": "warning (75)",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(100)",
+          "legendFormat": "critical (100)",
+          "refId": "C"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 75},
-              {"color": "red", "value": 100}
+          "min": 0,
+          "softMax": 110
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (75)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
             ]
           },
-          "custom": {
-            "thresholdsStyle": {"mode": "line"}
+          {
+            "matcher": {"id": "byName", "options": "critical (100)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
           }
-        },
-        "overrides": []
+        ]
       }
     },
     {
