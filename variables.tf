@@ -46,6 +46,18 @@ variable "backup" {
   }
 }
 
+variable "tcx_storage" {
+  description = "TCX activity file uploads S3 bucket config. The bucket holds uploaded TCX files; an IAM policy scoped to it is attached to the backend EC2 instance role so the backend authenticates without static keys."
+  type = object({
+    bucket_name                        = string
+    noncurrent_version_expiration_days = number
+  })
+  default = {
+    bucket_name                        = "prog-strength-tcx-uploads"
+    noncurrent_version_expiration_days = 30
+  }
+}
+
 variable "compute" {
   description = "EC2 instance config and the security group rules attached to it."
   type = object({

@@ -38,6 +38,15 @@ module "backup" {
   instance_role_name                 = module.compute.instance_role_name
 }
 
+module "tcx_storage" {
+  source = "./modules/tcx_storage"
+
+  name_prefix                        = local.name_prefix
+  bucket_name                        = var.tcx_storage.bucket_name
+  noncurrent_version_expiration_days = var.tcx_storage.noncurrent_version_expiration_days
+  instance_role_name                 = module.compute.instance_role_name
+}
+
 module "ecr" {
   source = "./modules/ecr"
 
