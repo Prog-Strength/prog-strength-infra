@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Cloud-init bootstrap for the prog-strength api host. Runs once, as root,
+# Cloud-init bootstrap for the prog-strength backend host. Runs once, as root,
 # on first boot of a freshly-launched instance. Output streams to
 # /var/log/cloud-init-output.log on the host — tail that file to debug.
 #

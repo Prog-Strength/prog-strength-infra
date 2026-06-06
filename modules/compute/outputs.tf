@@ -1,5 +1,5 @@
 output "instance_id" {
-  value = aws_instance.api.id
+  value = aws_instance.backend.id
 }
 
 output "elastic_ip" {
@@ -16,6 +16,6 @@ output "instance_role_name" {
 }
 
 output "instance_profile_name" {
-  description = "Instance profile attached to the API EC2 instance. Mostly here so the root-level output can re-expose it for AWS console convenience; the compute module attaches the profile to its own instance internally."
+  description = "Instance profile attached to the backend EC2 instance. Mostly here so the root-level output can re-expose it for AWS console convenience; the compute module attaches the profile to its own instance internally."
   value       = aws_iam_instance_profile.api.name
 }

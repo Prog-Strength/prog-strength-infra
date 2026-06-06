@@ -35,7 +35,7 @@ variable "network" {
 }
 
 variable "backup" {
-  description = "Litestream S3 replica bucket + IAM role/profile config. The bucket holds SQLite WAL frames and snapshots; the IAM role is attached to the API EC2 instance so Litestream authenticates without static keys."
+  description = "Litestream S3 replica bucket + IAM role/profile config. The bucket holds SQLite WAL frames and snapshots; the IAM role is attached to the backend EC2 instance so Litestream authenticates without static keys."
   type = object({
     bucket_name                        = string
     noncurrent_version_expiration_days = number

@@ -1,10 +1,10 @@
 resource "aws_security_group" "api" {
-  name        = "${var.name_prefix}-api"
-  description = "Ingress for the Prog Strength API host"
+  name        = "${var.name_prefix}-backend"
+  description = "Ingress for the Prog Strength backend host"
   vpc_id      = var.vpc_id
 
   tags = {
-    Name = "${var.name_prefix}-api"
+    Name = "${var.name_prefix}-backend"
   }
 }
 

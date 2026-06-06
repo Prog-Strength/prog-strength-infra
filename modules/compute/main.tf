@@ -17,7 +17,7 @@ data "aws_key_pair" "ssh" {
   key_name = var.ssh_key_name
 }
 
-resource "aws_instance" "api" {
+resource "aws_instance" "backend" {
   ami                         = data.aws_ami.selected.id
   instance_type               = var.instance_type
   subnet_id                   = var.subnet_id
@@ -48,7 +48,7 @@ resource "aws_instance" "api" {
   }
 
   tags = {
-    Name = "${var.name_prefix}-api"
+    Name = "${var.name_prefix}-backend"
   }
 
   # Pin AMI so a new Ubuntu publish doesn't replace the host (and wipe the SQLite DB).
@@ -69,11 +69,11 @@ resource "aws_eip" "api" {
   domain = "vpc"
 
   tags = {
-    Name = "${var.name_prefix}-api-eip"
+    Name = "${var.name_prefix}-backend-eip"
   }
 }
 
 resource "aws_eip_association" "api" {
-  instance_id   = aws_instance.api.id
+  instance_id   = aws_instance.backend.id
   allocation_id = aws_eip.api.id
 }
