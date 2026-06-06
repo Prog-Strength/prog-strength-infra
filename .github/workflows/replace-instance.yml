@@ -1,8 +1,9 @@
 # Manually re-provision the EC2 host that runs the prog-strength
 # backend. Useful for picking up a new AMI publish, recycling a host
 # that's misbehaving for whatever reason, or testing the disaster-
-# recovery path end-to-end (Litestream restore of app.db on first
-# boot, EIP re-association, bootstrap.sh + docker compose up).
+# recovery path end-to-end (Litestream restore of app.db AND
+# telemetry.db on first boot, EIP re-association, bootstrap.sh +
+# docker compose up).
 #
 # Triggered manually only. The confirmation input gate is the
 # safety against an accidental click — the workflow refuses to do
@@ -10,11 +11,13 @@
 #
 # What this destroys vs preserves:
 #   - Destroys: the running EC2 + its root EBS volume. That means
-#     telemetry.db, Grafana's own SQLite state, the Prometheus TSDB,
-#     and container logs all reset.
+#     Grafana's own SQLite state, the Prometheus TSDB, and container
+#     logs all reset.
 #   - Preserves: the Elastic IP (re-attaches automatically), the
-#     security group, the VPC. app.db comes back via Litestream
-#     restore as soon as the new instance runs docker compose up.
+#     security group, the VPC. Both app.db AND telemetry.db come back
+#     via Litestream restore as soon as the new instance runs docker
+#     compose up — each has its own restore sidecar in compose/api,
+#     wired into the api service's depends_on.
 #
 # Tunables / parameters: none deliberately. The only thing this
 # workflow can do is replace `module.compute.aws_instance.api`.
@@ -26,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type REPLACE to confirm. This destroys the running EC2 and its root volume. Only app.db survives (via Litestream).'
+        description: 'Type REPLACE to confirm. This destroys the running EC2 and its root volume. Both app.db and telemetry.db survive (via Litestream).'
         required: true
         type: string
 

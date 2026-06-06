@@ -28,6 +28,29 @@ services:
       - /data/app.db
     restart: "no"
 
+  # Same restore pattern for the telemetry DB. The `litestream restore`
+  # subcommand only restores one path per invocation, so we run a second
+  # one-shot container in parallel with `restore`. The api depends on
+  # both completing successfully — see depends_on below. The skip-guards
+  # are identical to `restore`: existing local DB wins; missing replica
+  # is a no-op for first-ever boots.
+  restore-telemetry:
+    image: litestream/litestream:0.3.13
+    environment:
+      - LITESTREAM_REPLICA_BUCKET=${LITESTREAM_REPLICA_BUCKET}
+      - LITESTREAM_REPLICA_REGION=${LITESTREAM_REPLICA_REGION:-us-east-2}
+    volumes:
+      - ./data:/data
+      - ./litestream.yml:/etc/litestream.yml:ro
+    command:
+      - restore
+      - -if-db-not-exists
+      - -if-replica-exists
+      - -config
+      - /etc/litestream.yml
+      - /data/telemetry.db
+    restart: "no"
+
   api:
     # ECR_REGISTRY and APP_VERSION come from .env, written by the deploy
     # workflow. Rollback = change APP_VERSION and re-run compose up; tags
@@ -55,6 +78,8 @@ services:
     restart: unless-stopped
     depends_on:
       restore:
+        condition: service_completed_successfully
+      restore-telemetry:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
