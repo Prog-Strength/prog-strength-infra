@@ -23,11 +23,11 @@ output "security_group_id" {
 }
 
 output "litestream_bucket_name" {
-  description = "S3 bucket Litestream replicates SQLite to. Set as LITESTREAM_REPLICA_BUCKET in the API host's .env."
+  description = "S3 bucket Litestream replicates SQLite to. Set as LITESTREAM_REPLICA_BUCKET in the backend host's .env."
   value       = module.backup.bucket_name
 }
 
 output "api_instance_profile_name" {
-  description = "Instance profile attached to the API EC2 instance. Listed for visibility; not needed at deploy time."
+  description = "Instance profile attached to the backend EC2 instance. Listed for visibility; not needed at deploy time."
   value       = module.compute.instance_profile_name
 }

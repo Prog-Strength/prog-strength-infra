@@ -1,4 +1,4 @@
-# --- IAM: role + instance profile for the API EC2 host ---------------------
+# --- IAM: role + instance profile for the backend EC2 host -----------------
 #
 # The role itself lives here because it's a property of the instance, not
 # of any one consumer (Litestream, ECR, etc.). Domain modules attach their
@@ -21,11 +21,11 @@ data "aws_iam_policy_document" "assume_role" {
 }
 
 resource "aws_iam_role" "api_instance" {
-  name               = "${var.name_prefix}-api-instance"
+  name               = "${var.name_prefix}-backend-instance"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 
 resource "aws_iam_instance_profile" "api" {
-  name = "${var.name_prefix}-api-instance"
+  name = "${var.name_prefix}-backend-instance"
   role = aws_iam_role.api_instance.name
 }

@@ -17,7 +17,7 @@
 #     restore as soon as the new instance runs docker compose up.
 #
 # Tunables / parameters: none deliberately. The only thing this
-# workflow can do is replace `module.compute.aws_instance.api`.
+# workflow can do is replace `module.compute.aws_instance.backend`.
 # Anything broader belongs in the regular apply pipeline.
 
 name: Replace EC2 Instance
@@ -78,7 +78,7 @@ jobs:
         run: |
           terraform plan \
             -var-file=environments/prod.tfvars \
-            -replace="module.compute.aws_instance.api" \
+            -replace="module.compute.aws_instance.backend" \
             -out=replace.tfplan
 
       - name: Terraform apply

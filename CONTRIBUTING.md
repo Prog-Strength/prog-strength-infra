@@ -51,7 +51,7 @@ pre-commit run --all-files
 The instance is pinned via `lifecycle.ignore_changes` (`modules/compute/main.tf`) so AMI publishes, bootstrap edits, and EIP-association quirks don't recycle the host. To deliberately replace it — e.g. to pick up a `bootstrap.sh` change on the live host — taint it locally and let the normal PR flow apply the change:
 
 ```sh
-terraform taint module.compute.aws_instance.api
+terraform taint module.compute.aws_instance.backend
 ```
 
 This marks the resource for replacement in your local state. Open a PR with whatever else you're changing (or an empty commit if there are no other changes), confirm the plan comment shows the `-/+` replacement, then merge. Apply runs and you get a fresh host.

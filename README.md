@@ -1,6 +1,6 @@
 # prog-strength-infra
 
-Terraform configuration for the Prog Strength API host (single EC2 instance behind an
+Terraform configuration for the Prog Strength backend host (single EC2 instance behind an
 Elastic IP, in a dedicated VPC with a public subnet). State lives in S3 with native
 S3 lockfile-based locking.
 
@@ -77,13 +77,13 @@ Litestream replica bucket + IAM role/policy. Owned by `modules/backup/`.
 
 | Field                                | Default                            | Notes                                                                |
 | ------------------------------------ | ---------------------------------- | -------------------------------------------------------------------- |
-| `bucket_name`                        | `prog-strength-database-backups`   | Globally-unique S3 name. Referenced from the API host's `.env`.      |
+| `bucket_name`                        | `prog-strength-database-backups`   | Globally-unique S3 name. Referenced from the backend host's `.env`.  |
 | `noncurrent_version_expiration_days` | `30`                               | Lifecycle rule on the versioned bucket; bounds storage cost.         |
 
 The bucket is private (public access fully blocked), versioned, and
 SSE-S3 encrypted. The associated IAM role grants `s3:Get/Put/Delete/List`
 on this bucket only and is exposed via an instance profile attached to
-`aws_instance.api`.
+`aws_instance.backend`.
 
 ## Outputs
 
@@ -95,8 +95,8 @@ on this bucket only and is exposed via an instance profile attached to
 | `vpc_id`                      |                                                                         |
 | `public_subnet_id`            |                                                                         |
 | `security_group_id`           |                                                                         |
-| `litestream_bucket_name`      | Set as `LITESTREAM_REPLICA_BUCKET` in the API host's `.env`.            |
-| `api_instance_profile_name`   | Visibility only — already wired into `aws_instance.api`.                |
+| `litestream_bucket_name`      | Set as `LITESTREAM_REPLICA_BUCKET` in the backend host's `.env`.        |
+| `api_instance_profile_name`   | Visibility only — already wired into `aws_instance.backend`.                |
 
 After apply:
 
