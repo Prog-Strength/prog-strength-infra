@@ -27,6 +27,11 @@ output "litestream_bucket_name" {
   value       = module.backup.bucket_name
 }
 
+output "tcx_bucket_name" {
+  description = "S3 bucket the backend stores uploaded TCX activity files in. Set as TCX_BUCKET_NAME in the backend host's .env."
+  value       = module.tcx_storage.bucket_name
+}
+
 output "api_instance_profile_name" {
   description = "Instance profile attached to the backend EC2 instance. Listed for visibility; not needed at deploy time."
   value       = module.compute.instance_profile_name

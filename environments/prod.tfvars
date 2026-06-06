@@ -33,6 +33,15 @@ backup = {
   noncurrent_version_expiration_days = 30
 }
 
+# --- TCX Storage Configurations (activity file uploads → S3) ---
+
+tcx_storage = {
+  # Globally-unique bucket name; the backend references this same value via
+  # the TCX_BUCKET_NAME env var. Versioned + lifecycled inside the module.
+  bucket_name                        = "prog-strength-tcx-uploads"
+  noncurrent_version_expiration_days = 30
+}
+
 # --- Compute Configurations (API & Database) ---
 
 compute = {
