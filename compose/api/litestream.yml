@@ -25,3 +25,16 @@ dbs:
         # to a subtree so this bucket could host other DBs in the future
         # (e.g. a staging environment) without colliding.
         path: prog-strength-api/prod
+
+  # Agent telemetry. Separate SQLite file (see internal/config/config.go's
+  # deriveTelemetryPath) so high-volume agent writes don't share locks
+  # or backups with the application data — but the per-turn structured
+  # history it holds is genuinely valuable, so it gets its own replica
+  # under a distinct prefix in the same bucket. The single litestream
+  # sidecar replicates both DBs.
+  - path: /data/telemetry.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_REPLICA_BUCKET}
+        region: ${LITESTREAM_REPLICA_REGION}
+        path: prog-strength-telemetry/prod

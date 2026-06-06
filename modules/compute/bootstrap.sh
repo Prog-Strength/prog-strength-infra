@@ -74,8 +74,9 @@ sudo -u ubuntu git clone "${infra_repo_url}" /home/ubuntu/prog-strength-infra
 
 # SQLite data dir. The api compose file bind-mounts `./data:/data` from
 # compose/api/, so pre-creating it avoids the volume being root-owned the
-# first time docker creates it implicitly. Litestream's restore service
-# will populate app.db from S3 on first boot if a replica exists.
+# first time docker creates it implicitly. Litestream's restore services
+# will populate app.db and telemetry.db from S3 on first boot if their
+# replicas exist.
 sudo -u ubuntu mkdir -p /home/ubuntu/prog-strength-infra/compose/api/data
 
 # Shared docker network. All three service stacks (api, mcp, agent)
