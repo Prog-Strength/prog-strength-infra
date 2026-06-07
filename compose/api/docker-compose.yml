@@ -71,6 +71,10 @@ services:
       - CORS_ALLOWED_ORIGIN=${CORS_ALLOWED_ORIGIN}
       - RETURN_TO_ALLOWED_ORIGINS=${RETURN_TO_ALLOWED_ORIGINS}
       - BETA_ALLOWED_EMAILS=${BETA_ALLOWED_EMAILS}
+      # If unset, the API silently falls back to an in-memory TCX archiver
+      # (running/server.go) and uploaded TCX files vanish on container restart
+      # — DB rows for those runs survive, the original bytes do not.
+      - TCX_BUCKET_NAME=${TCX_BUCKET_NAME}
     volumes:
       # Persist SQLite database on host. Resolves to the directory next to
       # this compose file (prog-strength-infra/compose/api/data on prod).
