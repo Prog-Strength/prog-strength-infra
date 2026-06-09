@@ -58,16 +58,20 @@ services:
       # Released semver (e.g. "v0.1.0"), surfaced by the /health endpoint.
       # Defaults to "dev" for local `docker compose up` without a release.
       - APP_VERSION=${APP_VERSION:-dev}
-      # Daily usage cap enforcement. False = UsageGate.check_or_raise
-      # short-circuits to a no-op so /chat and /speak never 429 on cap;
-      # the API still computes spend, telemetry still records TTS, the
-      # web settings bar still renders — only the hard block is off.
-      # First deploy of the cap feature should land with false so the
-      # gate's `agent_usage_gate_check_outcome_total` and the API's
-      # `api_usage_capped_total` can be validated before any user is
-      # actually blocked. Flip to true via a one-line PR + manual
-      # redeploy once validation passes. Override via .env is preserved.
-      - USAGE_GATE_ENABLED=${USAGE_GATE_ENABLED:-false}
+      # Daily usage cap enforcement. True = UsageGate.check_or_raise
+      # queries GET /me/usage (with a 30s per-user in-process cache)
+      # before /chat and /speak; capped users get HTTP 429 instead of
+      # burning Anthropic/OpenAI credits. The web UI's disabled-state
+      # logic is the visible layer; this is the wire-level backstop
+      # that bounds cost against direct-API callers, mobile clients
+      # without the disabled-state logic, and stolen-JWT replays.
+      #
+      # Operator escape hatch: set USAGE_GATE_ENABLED=false in .env on
+      # the host if a runaway-cap incident needs the gate disabled
+      # without waiting for a PR. The agent's soft-allow-on-API-failure
+      # behavior means a 5xx from /me/usage already degrades gracefully,
+      # so the override is only for "the gate itself is misbehaving."
+      - USAGE_GATE_ENABLED=${USAGE_GATE_ENABLED:-true}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request, sys; urllib.request.urlopen('http://localhost:8001/health', timeout=2)"]
