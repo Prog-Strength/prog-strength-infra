@@ -85,6 +85,15 @@ services:
       # upload 500s with running: tcx storage failed. Mirrors the
       # LITESTREAM_REPLICA_REGION forward the litestream sidecar uses.
       - AWS_REGION=${AWS_REGION}
+      # Per-user daily external-API spend ceiling. Hardcoded here, not
+      # forwarded from a GitHub secret, because the value is a public
+      # tunable and version control gives us a reviewable history of cap
+      # changes. ~$5/user/month at this rate (0.17 × 30 ≈ 5). Override
+      # path via `.env` is preserved for emergency tuning without a PR;
+      # set DAILY_USAGE_CAP_USD in the operator .env if you need to.
+      # 0 = capping disabled (the API treats it as "uncapped"); see
+      # internal/config/config.go for the read-side semantics.
+      - DAILY_USAGE_CAP_USD=${DAILY_USAGE_CAP_USD:-0.17}
     volumes:
       # Persist SQLite database on host. Resolves to the directory next to
       # this compose file (prog-strength-infra/compose/api/data on prod).
