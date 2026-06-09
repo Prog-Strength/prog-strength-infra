@@ -75,6 +75,16 @@ services:
       # (running/server.go) and uploaded TCX files vanish on container restart
       # — DB rows for those runs survive, the original bytes do not.
       - TCX_BUCKET_NAME=${TCX_BUCKET_NAME}
+      # The api's S3 archiver builds its client via config.LoadDefaultConfig,
+      # which resolves region from AWS_REGION / AWS_DEFAULT_REGION / config
+      # file / IMDS. None of those are reachable inside the container: env
+      # is empty unless we forward it, ~/.aws is absent, and IMDS is one hop
+      # away across the Docker bridge (default put-response-hop-limit is 1).
+      # Without this line, PutObject fails endpoint resolution with
+      # "Invalid region: region was not a valid DNS name" and every TCX
+      # upload 500s with running: tcx storage failed. Mirrors the
+      # LITESTREAM_REPLICA_REGION forward the litestream sidecar uses.
+      - AWS_REGION=${AWS_REGION}
     volumes:
       # Persist SQLite database on host. Resolves to the directory next to
       # this compose file (prog-strength-infra/compose/api/data on prod).
