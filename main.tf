@@ -47,6 +47,15 @@ module "tcx_storage" {
   instance_role_name                 = module.compute.instance_role_name
 }
 
+module "avatar_storage" {
+  source = "./modules/avatar_storage"
+
+  name_prefix            = local.name_prefix
+  bucket_name            = var.avatar_storage.bucket_name
+  orphan_expiration_days = var.avatar_storage.orphan_expiration_days
+  instance_role_name     = module.compute.instance_role_name
+}
+
 module "ecr" {
   source = "./modules/ecr"
 

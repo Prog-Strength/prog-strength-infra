@@ -32,6 +32,11 @@ output "tcx_bucket_name" {
   value       = module.tcx_storage.bucket_name
 }
 
+output "avatar_bucket_name" {
+  description = "S3 bucket the backend stores uploaded user avatars in. Set as AVATAR_BUCKET_NAME in the backend host's .env."
+  value       = module.avatar_storage.bucket_name
+}
+
 output "api_instance_profile_name" {
   description = "Instance profile attached to the backend EC2 instance. Listed for visibility; not needed at deploy time."
   value       = module.compute.instance_profile_name

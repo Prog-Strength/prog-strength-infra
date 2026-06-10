@@ -75,6 +75,11 @@ services:
       # (running/server.go) and uploaded TCX files vanish on container restart
       # — DB rows for those runs survive, the original bytes do not.
       - TCX_BUCKET_NAME=${TCX_BUCKET_NAME}
+      # If unset, the API silently falls back to an in-memory avatar store
+      # (internal/user/avatar_store.go) and uploaded avatars vanish on
+      # container restart — DB rows survive, the original bytes do not.
+      # The avatar store also needs AWS_REGION forwarded (see below).
+      - AVATAR_BUCKET_NAME=${AVATAR_BUCKET_NAME}
       # The api's S3 archiver builds its client via config.LoadDefaultConfig,
       # which resolves region from AWS_REGION / AWS_DEFAULT_REGION / config
       # file / IMDS. None of those are reachable inside the container: env
