@@ -42,6 +42,18 @@ tcx_storage = {
   noncurrent_version_expiration_days = 30
 }
 
+# --- Avatar Storage Configurations (user avatar uploads → S3) ---
+
+avatar_storage = {
+  # Globally-unique bucket name; the backend references this same value via
+  # the AVATAR_BUCKET_NAME env var. Not versioned (latest-wins via distinct
+  # UUID keys). The lifecycle rule expires ONLY objects the API tags
+  # avatar-status=orphaned after this many days — current avatars are
+  # untagged and never reaped.
+  bucket_name            = "prog-strength-avatars"
+  orphan_expiration_days = 7
+}
+
 # --- Compute Configurations (API & Database) ---
 
 compute = {

@@ -58,6 +58,18 @@ variable "tcx_storage" {
   }
 }
 
+variable "avatar_storage" {
+  description = "User avatar uploads S3 bucket config. The bucket holds uploaded avatar images; an IAM policy scoped to it is attached to the backend EC2 instance role so the backend authenticates without static keys. Reaping of superseded objects is by lifecycle rule on objects tagged avatar-status=orphaned (not age-based)."
+  type = object({
+    bucket_name            = string
+    orphan_expiration_days = number
+  })
+  default = {
+    bucket_name            = "prog-strength-avatars"
+    orphan_expiration_days = 7
+  }
+}
+
 variable "compute" {
   description = "EC2 instance config and the security group rules attached to it."
   type = object({
