@@ -41,3 +41,8 @@ output "api_instance_profile_name" {
   description = "Instance profile attached to the backend EC2 instance. Listed for visibility; not needed at deploy time."
   value       = module.compute.instance_profile_name
 }
+
+output "github_actions_role_arn" {
+  description = "Shared CI/CD role assumed by every repo's GitHub Actions. Set as the org-level AWS_GHA_ROLE_ARN secret."
+  value       = module.github_oidc.role_arn
+}

@@ -75,3 +75,10 @@ module "logging" {
   retention_days     = var.logging.retention_days
   monthly_budget_usd = var.logging.monthly_budget_usd
 }
+
+module "github_oidc" {
+  source = "./modules/github_oidc"
+
+  aws_region       = var.aws.region
+  oidc_thumbprints = var.github_oidc.oidc_thumbprints
+}

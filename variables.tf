@@ -133,3 +133,10 @@ variable "logging" {
     monthly_budget_usd = 5
   }
 }
+
+variable "github_oidc" {
+  description = "Shared GitHub Actions OIDC CI/CD role. One role for every Prog Strength repo's workflows — see prog-strength-docs/sows/github-actions-oidc-role.md. oidc_thumbprints must match the existing (imported) provider; fetch with `aws iam get-open-id-connect-provider`."
+  type = object({
+    oidc_thumbprints = list(string)
+  })
+}
