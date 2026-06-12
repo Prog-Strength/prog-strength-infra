@@ -115,3 +115,12 @@ ecr = {
   # Untagged images are build leftovers — short retention is fine.
   untagged_image_expire_days = 1
 }
+
+# --- GitHub Actions OIDC (shared CI/CD role) ---------------------------------
+
+github_oidc = {
+  # Must match the existing provider exactly (import is a no-op then).
+  # GitHub's OIDC TLS chain; AWS treats these as advisory for
+  # token.actions.githubusercontent.com but the API requires the field.
+  oidc_thumbprints = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+}
