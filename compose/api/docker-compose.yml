@@ -99,6 +99,15 @@ services:
       # 0 = capping disabled (the API treats it as "uncapped"); see
       # internal/config/config.go for the read-side semantics.
       - DAILY_USAGE_CAP_USD=${DAILY_USAGE_CAP_USD:-0.17}
+      # External nutrition lookup providers (GET /nutrition/lookup,
+      # surfaced to the agent via MCP's lookup_food_nutrition). Optional:
+      # empty values mean the endpoint answers 503 lookup_unavailable and
+      # the agent falls back to estimating macros itself. Values land in
+      # .env via the api repo's deploy workflow. See
+      # prog-strength-docs/sows/custom-meal-macro-accuracy.md.
+      - FATSECRET_CLIENT_ID=${FATSECRET_CLIENT_ID:-}
+      - FATSECRET_CLIENT_SECRET=${FATSECRET_CLIENT_SECRET:-}
+      - USDA_FDC_API_KEY=${USDA_FDC_API_KEY:-}
     volumes:
       # Persist SQLite database on host. Resolves to the directory next to
       # this compose file (prog-strength-infra/compose/api/data on prod).
