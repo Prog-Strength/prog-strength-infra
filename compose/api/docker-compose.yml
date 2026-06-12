@@ -93,16 +93,17 @@ services:
       # Per-user daily external-API spend ceiling. Hardcoded here, not
       # forwarded from a GitHub secret, because the value is a public
       # tunable and version control gives us a reviewable history of cap
-      # changes. ~$10/user/month at this rate (0.33 × 30 ≈ 10) — raised
-      # from 0.17 (~$5/month) on 2026-06-12 after the owner hit the
-      # daily cap under normal usage. Override path via `.env` is
+      # changes. ~$20/user/month at this rate (0.67 × 30 ≈ 20) — raised
+      # from 0.17 (~$5/month) and then 0.33 (~$10/month) on 2026-06-12
+      # after the owner kept hitting the daily cap under normal usage.
+      # Override path via `.env` is
       # preserved for emergency tuning without a PR; set
       # DAILY_USAGE_CAP_USD in the operator .env if you need to (note:
       # the api deploy workflow rewrites .env, so manual overrides only
       # live until the next deploy — this default is the durable knob).
       # 0 = capping disabled (the API treats it as "uncapped"); see
       # internal/config/config.go for the read-side semantics.
-      - DAILY_USAGE_CAP_USD=${DAILY_USAGE_CAP_USD:-0.33}
+      - DAILY_USAGE_CAP_USD=${DAILY_USAGE_CAP_USD:-0.67}
       # External nutrition lookup providers (GET /nutrition/lookup,
       # surfaced to the agent via MCP's lookup_food_nutrition). Optional:
       # empty values mean the endpoint answers 503 lookup_unavailable and
