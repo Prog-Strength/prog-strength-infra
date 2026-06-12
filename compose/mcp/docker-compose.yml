@@ -22,13 +22,6 @@ services:
       # Released semver (e.g. "v0.1.0"), surfaced by the /health endpoint.
       # Defaults to "dev" for local `docker compose up` without a release.
       - APP_VERSION=${APP_VERSION:-dev}
-      # External nutrition lookup providers (lookup_food_nutrition).
-      # Optional: empty values mean the tool answers lookup_unavailable
-      # and the agent falls back to estimating macros itself. Values
-      # land in .env via the mcp repo's deploy workflow.
-      - FATSECRET_CLIENT_ID=${FATSECRET_CLIENT_ID:-}
-      - FATSECRET_CLIENT_SECRET=${FATSECRET_CLIENT_SECRET:-}
-      - USDA_FDC_API_KEY=${USDA_FDC_API_KEY:-}
     restart: unless-stopped
     # Ship stdout/stderr to CloudWatch Logs via Docker's built-in
     # awslogs driver. Log group is pre-created by the Terraform
