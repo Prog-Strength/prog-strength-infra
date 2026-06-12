@@ -112,6 +112,13 @@ services:
       - FATSECRET_CLIENT_ID=${FATSECRET_CLIENT_ID:-}
       - FATSECRET_CLIENT_SECRET=${FATSECRET_CLIENT_SECRET:-}
       - USDA_FDC_API_KEY=${USDA_FDC_API_KEY:-}
+      # Structured-log verbosity for the nutrition lookup path (the
+      # repo's first slog adopter; log.Printf elsewhere is unaffected).
+      # debug while the feature is under active development — flip to
+      # info here (a reviewable one-line change, like the usage cap
+      # above) once things reach steady state to cut CloudWatch
+      # ingestion volume per request.
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
     volumes:
       # Persist SQLite database on host. Resolves to the directory next to
       # this compose file (prog-strength-infra/compose/api/data on prod).
