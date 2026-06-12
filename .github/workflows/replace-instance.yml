@@ -35,6 +35,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # mint the OIDC token for configure-aws-credentials
 
 # Same concurrency group as the regular apply workflow so the two
 # can't race against each other on the state file. A normal `terraform
@@ -63,8 +64,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_GHA_ROLE_ARN }}
           aws-region: us-east-2
 
       - uses: hashicorp/setup-terraform@v3
