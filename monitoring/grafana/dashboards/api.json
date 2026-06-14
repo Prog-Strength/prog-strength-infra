@@ -8,11 +8,22 @@
   "time": {"from": "now-6h", "to": "now"},
   "panels": [
     {
+      "id": 14,
+      "type": "text",
+      "title": "",
+      "transparent": true,
+      "gridPos": {"h": 3, "w": 24, "x": 0, "y": 0},
+      "options": {
+        "mode": "markdown",
+        "content": "### API Health\nLow-traffic production API — **every 5xx is worth investigating individually**, so this dashboard favors raw error counts over ratios. Sections below: **Traffic** (request volume & busiest routes) · **Errors** (5xx rate _and_ raw 5xx counts by route — warning at 1 error, critical at 3) · **Resources & latency** (goroutines, memory, and server-side latency percentiles). Hover any panel's title (ⓘ) for details and threshold meanings."
+      }
+    },
+    {
       "id": 1,
       "type": "stat",
       "title": "Requests (24h)",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 3},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -35,14 +46,14 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "5xx error rate (24h)",
-      "description": "Fraction of requests in the last 24h that returned 5xx. 4xx are excluded — those are client errors (bad auth, malformed input) and rarely indicate a real problem.",
+      "title": "5xx errors (24h)",
+      "description": "Raw count of 5xx responses in the last 24h. For a low-traffic app the magnitude matters more than the ratio — one error is worth a look, three or more is a real problem. 4xx are excluded; those are client errors (bad auth, malformed input) and rarely indicate a real problem.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 3},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "100 * sum(increase(ps_http_requests_total{status=~\"5..\"}[24h])) / clamp_min(sum(increase(ps_http_requests_total[24h])), 1)",
+          "expr": "sum(increase(ps_http_requests_total{status=~\"5..\"}[24h]))",
           "refId": "A",
           "instant": true
         }
@@ -55,14 +66,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
-          "decimals": 2,
+          "unit": "short",
+          "decimals": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {"color": "green", "value": null},
-              {"color": "yellow", "value": 0.5},
-              {"color": "red", "value": 2}
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 3}
             ]
           }
         },
@@ -74,7 +85,7 @@
       "type": "stat",
       "title": "p95 server-side latency (now)",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 3},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -110,7 +121,7 @@
       "type": "stat",
       "title": "p99 server-side latency (now)",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 3},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -142,11 +153,19 @@
       }
     },
     {
+      "id": 11,
+      "type": "row",
+      "title": "Traffic",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 7},
+      "panels": []
+    },
+    {
       "id": 5,
       "type": "timeseries",
       "title": "Request rate (RPS, by route)",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -164,75 +183,47 @@
       }
     },
     {
-      "id": 6,
-      "type": "timeseries",
-      "title": "Server-side latency percentiles (p50 / p95 / p99)",
-      "description": "Measured inside the server handler — excludes the client⇄server network round-trip and TLS handshake. Overall request latency across every route. Use the per-route variants by clicking 'Edit' on this panel and adding a label filter, or drill down via 5xx rate by route if the cause of a spike is unclear. Dashed yellow / red lines mark the warning and critical thresholds.",
+      "id": 8,
+      "type": "bargauge",
+      "title": "Top routes (24h)",
+      "description": "Leaderboard of routes by total requests over the last 24 hours.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
-          "legendFormat": "p50",
-          "refId": "A"
-        },
-        {
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
-          "legendFormat": "p95",
-          "refId": "B"
-        },
-        {
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
-          "legendFormat": "p99",
-          "refId": "C"
-        },
-        {
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "vector(0.5)",
-          "legendFormat": "warning (500ms)",
-          "refId": "D"
-        },
-        {
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "vector(1)",
-          "legendFormat": "critical (1s)",
-          "refId": "E"
+          "expr": "topk(10, sum by (route) (increase(ps_http_requests_total[24h])))",
+          "legendFormat": "{{route}}",
+          "refId": "A",
+          "instant": true
         }
       ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
+      },
       "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "min": 0,
-          "softMax": 1.2
-        },
-        "overrides": [
-          {
-            "matcher": {"id": "byName", "options": "warning (500ms)"},
-            "properties": [
-              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
-              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
-            ]
-          },
-          {
-            "matcher": {"id": "byName", "options": "critical (1s)"},
-            "properties": [
-              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
-              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
-            ]
-          }
-        ]
+        "defaults": {"unit": "short", "decimals": 0},
+        "overrides": []
       }
+    },
+    {
+      "id": 12,
+      "type": "row",
+      "title": "Errors",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 16},
+      "panels": []
     },
     {
       "id": 7,
       "type": "timeseries",
       "title": "5xx rate by route",
-      "description": "Server-side errors broken out by route. A spike here usually points at a specific handler — start there, not at infra. Dashed yellow / red lines mark the warning and critical thresholds.",
+      "description": "Server-side error rate (errors/sec) broken out by route — the proportion-of-traffic view. A spike here usually points at a specific handler — start there, not at infra. Dashed yellow / red lines mark the warning and critical thresholds. For the raw count of affected calls, see '5xx errors by route' to the right.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -278,31 +269,64 @@
       }
     },
     {
-      "id": 8,
-      "type": "bargauge",
-      "title": "Top routes (24h)",
-      "description": "Leaderboard of routes by total requests over the last 24 hours.",
+      "id": 13,
+      "type": "timeseries",
+      "title": "5xx errors by route",
+      "description": "Raw count of 5xx responses per route over each trailing 5-minute window — the magnitude of failures and roughly how many calls/users were affected, not just the ratio. For a low-traffic app even a single error is worth investigating. Dashed yellow / red lines mark the warning (1 error) and critical (3 errors) thresholds.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "topk(10, sum by (route) (increase(ps_http_requests_total[24h])))",
+          "expr": "sum by (route) (increase(ps_http_requests_total{status=~\"5..\"}[5m]))",
           "legendFormat": "{{route}}",
-          "refId": "A",
-          "instant": true
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(1)",
+          "legendFormat": "warning (1)",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(3)",
+          "legendFormat": "critical (3)",
+          "refId": "C"
         }
       ],
-      "options": {
-        "orientation": "horizontal",
-        "displayMode": "gradient",
-        "showUnfilled": true,
-        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
-      },
       "fieldConfig": {
-        "defaults": {"unit": "short", "decimals": 0},
-        "overrides": []
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "softMax": 4
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (1)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "critical (3)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          }
+        ]
       }
+    },
+    {
+      "id": 15,
+      "type": "row",
+      "title": "Resources & latency",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 25},
+      "panels": []
     },
     {
       "id": 9,
@@ -310,7 +334,7 @@
       "title": "Goroutines",
       "description": "Active goroutines inside the API process. Steady-state is small (~20-50); a slow climb usually means a leak — a request handler spawning goroutines that never exit. Dashed yellow / red lines mark the warning and critical thresholds.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 26},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -361,7 +385,7 @@
       "title": "Memory (RSS)",
       "description": "Resident set size of the API process — how much physical memory it's actually holding. Compare to the host's available memory if this trends up over time. Dashed yellow / red lines mark the warning and critical thresholds.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 26},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -398,6 +422,69 @@
           },
           {
             "matcher": {"id": "byName", "options": "critical (512 MiB)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Server-side latency percentiles (p50 / p95 / p99)",
+      "description": "Measured inside the server handler — excludes the client⇄server network round-trip and TLS handshake. Overall request latency across every route. Use the per-route variants by clicking 'Edit' on this panel and adding a label filter, or drill down via 5xx rate by route if the cause of a spike is unclear. Dashed yellow / red lines mark the warning and critical thresholds.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 34},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(ps_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(0.5)",
+          "legendFormat": "warning (500ms)",
+          "refId": "D"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(1)",
+          "legendFormat": "critical (1s)",
+          "refId": "E"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "softMax": 1.2
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (500ms)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "critical (1s)"},
             "properties": [
               {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
               {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
