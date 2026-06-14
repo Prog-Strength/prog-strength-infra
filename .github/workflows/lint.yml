@@ -1,0 +1,49 @@
+name: Lint
+
+# Static analysis that needs no cloud access — runs on every PR targeting
+# main, separate from the Terraform Plan workflow so it gives fast feedback
+# and never assumes the AWS OIDC role just to lint. These checks mirror the
+# pre-commit hooks (.pre-commit-config.yaml) so a clean local run predicts a
+# green PR. terraform fmt/validate stay in plan.yml (validate needs `init`);
+# the heavyweight terraform plan stays there too.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # One in-flight lint per PR; newer pushes cancel the previous run.
+  group: lint-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  tflint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.59.1
+
+      - name: tflint --init
+        # Installs the terraform ruleset plugin pinned in .tflint.hcl.
+        run: tflint --init
+
+      - name: tflint --recursive
+        # Lints the root module and every module under modules/.
+        run: tflint --recursive --format compact
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        # shellcheck is preinstalled on ubuntu-latest runners. bootstrap.sh
+        # is the only shell in the repo (a Terraform templatefile); its
+        # template-artifact findings are suppressed by an in-file directive.
+        run: shellcheck modules/compute/bootstrap.sh

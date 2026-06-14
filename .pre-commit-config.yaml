@@ -1,27 +1,57 @@
-# pre-commit config — shortens the feedback loop for the checks that CI
-# already enforces in .github/workflows/plan.yml. Run `pre-commit install`
-# once after cloning; from then on `git commit` runs these locally.
+# pre-commit config — shortens the feedback loop for the checks CI enforces
+# on every PR (.github/workflows/lint.yml and plan.yml). Run
+# `pre-commit install` once after cloning; it arms both hook stages (see
+# default_install_hook_types). From then on:
+#   - `git commit` runs the fast, auto-fixing checks (fmt, hygiene, shellcheck)
+#   - `git push`   runs the slower gates (validate, tflint) before the PR
+# terraform plan is intentionally NOT mirrored here — it needs AWS creds and
+# network access to the state backend, so it stays a PR-only check (plan.yml).
 #
+# tflint needs its plugin installed once: `tflint --init`.
 # Update pinned versions with `pre-commit autoupdate`.
+
+default_install_hook_types: [pre-commit, pre-push]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        stages: [pre-commit]
       - id: end-of-file-fixer
+        stages: [pre-commit]
       - id: check-merge-conflict
+        stages: [pre-commit]
       - id: check-yaml
+        stages: [pre-commit]
       - id: check-added-large-files
+        stages: [pre-commit]
 
   - repo: https://github.com/antonbabenko/pre-commit-terraform
     rev: v1.96.2
     hooks:
+      # Fast + auto-fixing — runs on commit.
       - id: terraform_fmt
+        stages: [pre-commit]
+
+      # Slower gates — run on push, mirroring the PR status checks.
       - id: terraform_validate
+        stages: [pre-push]
         args:
           # -backend=false lets validate run without AWS credentials or
-          # network access to the S3 state bucket — keeps `git commit`
-          # fast and offline-friendly. CI does a full `init` + `validate`
-          # against the real backend in plan.yml.
+          # network access to the S3 state bucket — keeps the hook fast and
+          # offline-friendly. CI does a full `init` + `validate` against the
+          # real backend in plan.yml.
           - --tf-init-args=-backend=false
+      - id: terraform_tflint
+        stages: [pre-push]
+        args:
+          - --args=--recursive
+          - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
+
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.10.0
+    hooks:
+      # Fast — runs on commit. bootstrap.sh is the only shell in the repo.
+      - id: shellcheck
+        stages: [pre-commit]
