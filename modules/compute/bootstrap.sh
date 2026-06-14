@@ -9,6 +9,17 @@
 # via `ignore_changes` so editing this file does not re-trigger it on the
 # running instance.
 
+# Linter note: this file is a Terraform templatefile(), not a standalone
+# script, so the SC2154/SC2034 disable below silences two template
+# artifacts (not bugs):
+#   - `${infra_repo_url}` is a Terraform interpolation injected at render
+#     time, which the linter reads as an unassigned variable (SC2154).
+#   - `$${aws_arch}` / `$${ff_arch}` are Terraform-escaped `$$` shell
+#     references; the linter sees the `$$` (PID) and misses the use, so it
+#     reports the assignments as unused (SC2034).
+# Every other rule stays active on the rest of the script.
+# shellcheck disable=SC2154,SC2034
+
 set -euxo pipefail
 
 # --- System update -----------------------------------------------------------
