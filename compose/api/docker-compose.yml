@@ -71,6 +71,11 @@ services:
       - CORS_ALLOWED_ORIGIN=${CORS_ALLOWED_ORIGIN}
       - RETURN_TO_ALLOWED_ORIGINS=${RETURN_TO_ALLOWED_ORIGINS}
       - BETA_ALLOWED_EMAILS=${BETA_ALLOWED_EMAILS}
+      # Comma-separated operator emails that gate the runtime beta-allowlist
+      # admin surface (/admin/beta-emails). If unset, that surface is
+      # fail-closed (every admin route 403s) and the beta gate runs off the
+      # DB-backed allowlist seeded from BETA_ALLOWED_EMAILS on first boot.
+      - ADMIN_EMAILS=${ADMIN_EMAILS}
       # If unset, the API silently falls back to an in-memory TCX archiver
       # (running/server.go) and uploaded TCX files vanish on container restart
       # — DB rows for those runs survive, the original bytes do not.
