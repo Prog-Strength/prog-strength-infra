@@ -224,19 +224,20 @@ data "aws_iam_policy_document" "permissions" {
     ]
   }
 
-  # developer's Dispatch SOW workflow gates each dispatch on a per-SOW
-  # lock in the fleet run registry (acquire / attach / list / force-
-  # release) — see prog-strength-docs/sows/fleet-dispatch-gating.md. The
-  # table is created by developer's own terraform; only the access grant
-  # belongs to this shared CI role. Scoped to the single table ARN.
+  # Fleet run registry (per-SOW dispatch lock) — see
+  # prog-strength-docs/sows/fleet-dispatch-gating.md. This one role does
+  # double duty on this table:
+  #   - control plane: developer's `terraform apply` (this role) CREATES
+  #     and manages the table, and the aws provider calls several Describe*
+  #     APIs on every refresh — so a data-plane-only grant fails apply with
+  #     "not authorized to perform dynamodb:CreateTable".
+  #   - data plane: the Dispatch SOW workflow + worker acquire / attach /
+  #     release / list.
+  # Granting dynamodb:* scoped to the single table ARN covers both and is
+  # consistent with the ec2:*/ecr:*/s3:* resource-scoped statements above.
   statement {
-    sid = "FleetRunRegistry"
-    actions = [
-      "dynamodb:GetItem",
-      "dynamodb:PutItem",
-      "dynamodb:UpdateItem",
-      "dynamodb:Scan",
-    ]
+    sid     = "FleetRunRegistry"
+    actions = ["dynamodb:*"]
     resources = [
       "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/prog-strength-developer-runs",
     ]
