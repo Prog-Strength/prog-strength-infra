@@ -223,6 +223,24 @@ data "aws_iam_policy_document" "permissions" {
       "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:prog-strength-developer/*",
     ]
   }
+
+  # developer's Dispatch SOW workflow gates each dispatch on a per-SOW
+  # lock in the fleet run registry (acquire / attach / list / force-
+  # release) — see prog-strength-docs/sows/fleet-dispatch-gating.md. The
+  # table is created by developer's own terraform; only the access grant
+  # belongs to this shared CI role. Scoped to the single table ARN.
+  statement {
+    sid = "FleetRunRegistry"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:Scan",
+    ]
+    resources = [
+      "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/prog-strength-developer-runs",
+    ]
+  }
 }
 
 resource "aws_iam_role_policy" "github_actions" {
