@@ -66,7 +66,16 @@ services:
       - JWT_SIGNING_KEY=${JWT_SIGNING_KEY}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      # base64-encoded 32-byte AES key used to encrypt stored Google
+      # refresh tokens at rest. Optional here (delivered via .env by the
+      # api repo's deploy workflow, same as the secrets above). Losing or
+      # rotating this key invalidates every stored refresh token — users
+      # must re-consent to Google Calendar. Mint with `openssl rand -base64 32`.
+      - CALENDAR_TOKEN_ENC_KEY=${CALENDAR_TOKEN_ENC_KEY:-}
       - GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL}
+      # Second OAuth callback URL for the Google Calendar consent flow
+      # (Phase 3). Optional; lands in .env via the api deploy workflow.
+      - GOOGLE_CALENDAR_REDIRECT_URL=${GOOGLE_CALENDAR_REDIRECT_URL:-}
       - DEV_AUTH=${DEV_AUTH}
       - CORS_ALLOWED_ORIGIN=${CORS_ALLOWED_ORIGIN}
       - RETURN_TO_ALLOWED_ORIGINS=${RETURN_TO_ALLOWED_ORIGINS}
