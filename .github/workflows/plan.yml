@@ -42,7 +42,10 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: terraform init
-        run: terraform init
+        # Per-env state key under this app's prefix; defaults to prod.
+        run: |
+          terraform init \
+            -backend-config="key=prog-strength-backend/${TF_STATE_ENV:-prod}/terraform.tfstate"
 
       - name: terraform validate
         run: terraform validate
