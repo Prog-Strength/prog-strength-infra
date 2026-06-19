@@ -71,7 +71,9 @@ jobs:
         with:
           terraform_version: 1.13.0
 
-      - run: terraform init
+      - run: |
+          terraform init \
+            -backend-config="key=prog-strength-backend/${TF_STATE_ENV:-prod}/terraform.tfstate"
 
       # Plan separately so the GitHub Actions log shows exactly what
       # the replace is about to do (destroy + create) before pulling

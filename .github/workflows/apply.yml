@@ -28,5 +28,7 @@ jobs:
         with:
           terraform_version: 1.13.0
 
-      - run: terraform init
+      - run: |
+          terraform init \
+            -backend-config="key=prog-strength-backend/${TF_STATE_ENV:-prod}/terraform.tfstate"
       - run: terraform apply -auto-approve -var-file=environments/prod.tfvars
