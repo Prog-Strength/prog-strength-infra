@@ -60,9 +60,16 @@ services:
     # internal network. Caddy is the only public-facing container.
     expose:
       - "8080"
+    # Only secrets, Terraform-owned identities, and PII are forwarded to the
+    # api container now. Every non-secret app knob that used to live here —
+    # DATABASE_URL, SERVER_ADDR, DEV_AUTH, the OAuth redirect URLs, CORS /
+    # return-to origins, DAILY_USAGE_CAP_USD, LOG_LEVEL — is now a public
+    # literal in config.toml, embedded in the api image (single owner: the
+    # service that uses it). See
+    # prog-strength-docs/sows/centralized-api-config.md. config.toml references
+    # each ${VAR} below as a label; the values still arrive via .env, written
+    # by the api repo's deploy workflow.
     environment:
-      - DATABASE_URL=/data/app.db
-      - SERVER_ADDR=:8080
       - JWT_SIGNING_KEY=${JWT_SIGNING_KEY}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
@@ -72,18 +79,13 @@ services:
       # rotating this key invalidates every stored refresh token — users
       # must re-consent to Google Calendar. Mint with `openssl rand -base64 32`.
       - CALENDAR_TOKEN_ENC_KEY=${CALENDAR_TOKEN_ENC_KEY:-}
-      - GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL}
-      # Second OAuth callback URL for the Google Calendar consent flow
-      # (Phase 3). Optional; lands in .env via the api deploy workflow.
-      - GOOGLE_CALENDAR_REDIRECT_URL=${GOOGLE_CALENDAR_REDIRECT_URL:-}
-      - DEV_AUTH=${DEV_AUTH}
-      - CORS_ALLOWED_ORIGIN=${CORS_ALLOWED_ORIGIN}
-      - RETURN_TO_ALLOWED_ORIGINS=${RETURN_TO_ALLOWED_ORIGINS}
-      - BETA_ALLOWED_EMAILS=${BETA_ALLOWED_EMAILS}
-      # Comma-separated operator emails that gate the runtime beta-allowlist
-      # admin surface (/admin/beta-emails). If unset, that surface is
+      # PII (real email addresses) — kept env-sourced, never committed to the
+      # public config.toml. BETA_ALLOWED_EMAILS seeds the DB-backed allowlist
+      # on first boot; ADMIN_EMAILS gates the runtime beta-allowlist admin
+      # surface (/admin/beta-emails). If ADMIN_EMAILS is unset, that surface is
       # fail-closed (every admin route 403s) and the beta gate runs off the
       # DB-backed allowlist seeded from BETA_ALLOWED_EMAILS on first boot.
+      - BETA_ALLOWED_EMAILS=${BETA_ALLOWED_EMAILS}
       - ADMIN_EMAILS=${ADMIN_EMAILS}
       # If unset, the API silently falls back to an in-memory TCX archiver
       # (running/server.go) and uploaded TCX files vanish on container restart
@@ -102,22 +104,10 @@ services:
       # Without this line, PutObject fails endpoint resolution with
       # "Invalid region: region was not a valid DNS name" and every TCX
       # upload 500s with running: tcx storage failed. Mirrors the
-      # LITESTREAM_REPLICA_REGION forward the litestream sidecar uses.
+      # LITESTREAM_REPLICA_REGION forward the litestream sidecar uses. The
+      # api also fails startup if a bucket is set without AWS_REGION (see
+      # internal/config validation).
       - AWS_REGION=${AWS_REGION}
-      # Per-user daily external-API spend ceiling. Hardcoded here, not
-      # forwarded from a GitHub secret, because the value is a public
-      # tunable and version control gives us a reviewable history of cap
-      # changes. ~$20/user/month at this rate (0.67 × 30 ≈ 20) — raised
-      # from 0.17 (~$5/month) and then 0.33 (~$10/month) on 2026-06-12
-      # after the owner kept hitting the daily cap under normal usage.
-      # Override path via `.env` is
-      # preserved for emergency tuning without a PR; set
-      # DAILY_USAGE_CAP_USD in the operator .env if you need to (note:
-      # the api deploy workflow rewrites .env, so manual overrides only
-      # live until the next deploy — this default is the durable knob).
-      # 0 = capping disabled (the API treats it as "uncapped"); see
-      # internal/config/config.go for the read-side semantics.
-      - DAILY_USAGE_CAP_USD=${DAILY_USAGE_CAP_USD:-0.67}
       # External nutrition lookup providers (GET /nutrition/lookup,
       # surfaced to the agent via MCP's lookup_food_nutrition). Optional:
       # empty values mean the endpoint answers 503 lookup_unavailable and
@@ -127,13 +117,11 @@ services:
       - FATSECRET_CLIENT_ID=${FATSECRET_CLIENT_ID:-}
       - FATSECRET_CLIENT_SECRET=${FATSECRET_CLIENT_SECRET:-}
       - USDA_FDC_API_KEY=${USDA_FDC_API_KEY:-}
-      # Structured-log verbosity for the nutrition lookup path (the
-      # repo's first slog adopter; log.Printf elsewhere is unaffected).
-      # debug while the feature is under active development — flip to
-      # info here (a reviewable one-line change, like the usage cap
-      # above) once things reach steady state to cut CloudWatch
-      # ingestion volume per request.
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
+      # Agent Vector Memory provider keys (config.toml [vectormemory]
+      # references these as ${VAR} labels). Optional until that feature
+      # ships; empty values leave it dormant.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     volumes:
       # Persist SQLite database on host. Resolves to the directory next to
       # this compose file (prog-strength-infra/compose/api/data on prod).
