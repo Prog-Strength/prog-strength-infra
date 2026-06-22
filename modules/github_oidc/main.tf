@@ -226,12 +226,15 @@ data "aws_iam_policy_document" "permissions" {
 
   # Backend runtime secrets (prog-strength-backend/*). The apply pipeline
   # creates the containers (CreateSecret/TagResource) and seed-secrets.yml
-  # writes their values (PutSecretValue/DescribeSecret). Scoped to
-  # prog-strength-backend/* so the same role manages every environment's
-  # backend secrets as they are added. Separate from the
-  # prog-strength-developer/* Describe grant above so the two secret families
-  # stay independently auditable. CI seeds values from GitHub; it never reads
-  # them back (no GetSecretValue here — only the instance role reads values).
+  # writes their values (PutSecretValue/DescribeSecret). DescribeSecret and
+  # GetResourcePolicy are also what the aws provider reads to refresh each
+  # aws_secretsmanager_secret on every plan — once a container exists, a plan
+  # fails without them. Scoped to prog-strength-backend/* so the same role
+  # manages every environment's backend secrets as they are added. Separate
+  # from the prog-strength-developer/* Describe grant above so the two secret
+  # families stay independently auditable. CI seeds values from GitHub; it
+  # never reads them back (no GetSecretValue here — only the instance role
+  # reads values).
   statement {
     sid = "SecretsManagerBackendManage"
     actions = [
@@ -239,6 +242,7 @@ data "aws_iam_policy_document" "permissions" {
       "secretsmanager:TagResource",
       "secretsmanager:PutSecretValue",
       "secretsmanager:DescribeSecret",
+      "secretsmanager:GetResourcePolicy",
     ]
     resources = [
       "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:prog-strength-backend/*",
