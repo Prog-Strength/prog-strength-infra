@@ -82,3 +82,11 @@ module "github_oidc" {
   aws_region       = var.aws.region
   oidc_thumbprints = var.github_oidc.oidc_thumbprints
 }
+
+module "secrets" {
+  source = "./modules/secrets"
+
+  env                = var.project.environment
+  services           = var.secrets.services
+  instance_role_name = module.compute.instance_role_name
+}

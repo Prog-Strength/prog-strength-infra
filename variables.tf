@@ -134,6 +134,13 @@ variable "logging" {
   }
 }
 
+variable "secrets" {
+  description = "Backend runtime secret containers (AWS Secrets Manager). One JSON secret per service under prog-strength-backend/<env>/<service>; values are seeded by seed-secrets.yml, never stored in Terraform state."
+  type = object({
+    services = map(string)
+  })
+}
+
 variable "github_oidc" {
   description = "Shared GitHub Actions OIDC CI/CD role. One role for every Prog Strength repo's workflows — see prog-strength-docs/sows/github-actions-oidc-role.md. oidc_thumbprints must match the existing (imported) provider; fetch with `aws iam get-open-id-connect-provider`."
   type = object({

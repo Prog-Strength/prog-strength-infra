@@ -78,7 +78,7 @@ for prod live in `environments/prod.tfvars`.
 | Module                   | What it provisions                                                            |
 | ------------------------ | ----------------------------------------------------------------------------- |
 | `network`                | VPC, public subnet, IGW, route table.                                         |
-| `security_group`         | The instance's security group (SSH / 80 / 443).                               |
+| `security_group`         | The instance's security group (80 / 443; no inbound SSH).                     |
 | `compute`                | The EC2 host, its EIP, the instance IAM role/profile, and `bootstrap.sh`.     |
 | `backup`                 | Litestream S3 replica bucket (SQLite WAL + snapshots) and its scoped policy.  |
 | `tcx_storage`            | S3 bucket for Garmin TCX activity-file uploads.                               |
@@ -86,6 +86,7 @@ for prod live in `environments/prod.tfvars`.
 | `ecr`                    | One ECR repo per service (`api`, `mcp`, `agent`) + lifecycle policies.        |
 | `logging`                | CloudWatch log groups per service + an `EstimatedCharges` budget alarm.       |
 | `github_oidc`            | The **shared** CI/CD OIDC role used by every Prog Strength repo's workflows.  |
+| `secrets`                | Secrets Manager containers (`prog-strength-backend/<env>/<service>`) + the instance role's scoped `GetSecretValue`. Values are seeded by `seed-secrets.yml`, never in TF state. |
 
 The `backup`/`tcx_storage`/`avatar_storage`/`ecr`/`logging` modules each
 attach a scoped policy to the **single** instance role the `compute`
@@ -102,7 +103,8 @@ state rather than created (e.g. the pre-existing OIDC provider).
 | `lint.yml`                | PR → main                        | `tflint --recursive` + `shellcheck`. No AWS access; fast feedback.  |
 | `plan.yml`                | PR → main                        | fmt-check, init, validate, then `terraform plan` as a sticky comment. |
 | `apply.yml`               | push → main (and manual)         | `terraform apply -auto-approve` against prod.                       |
-| `deploy-caddy.yml`        | push → main touching `caddy/**`  | SSHes in and reloads Caddy in place (keeps issued LE certs).        |
+| `deploy-caddy.yml`        | push → main touching `caddy/**`  | Reloads Caddy via SSM Run Command (no SSH; keeps issued LE certs).  |
+| `seed-secrets.yml`        | manual (`workflow_dispatch`)     | Syncs backend app config from GitHub secrets into Secrets Manager.  |
 | `replace-instance.yml`    | manual, typed `REPLACE` gate     | Deliberately replaces the EC2 host. See below.                      |
 
 ## The danger zone
@@ -139,6 +141,10 @@ Out of scope by design — do not add without asking:
 - **A staging environment.** There is one environment (`prod`). If multi-env
   becomes real, it's a design conversation, not a drive-by `count`/workspace
   change.
-- **Secrets managers / Vault for app config.** App secrets live in the
-  host's gitignored `.env`. Don't introduce a secrets backend without a
-  reason that's been agreed.
+- **Expanding the secrets surface beyond Secrets Manager.** Backend app
+  config now lives in infra-owned AWS Secrets Manager
+  (`prog-strength-backend/<env>/<service>`), seeded from GitHub secrets by
+  `seed-secrets.yml` and rendered into the host's `.env` at deploy time —
+  see `prog-strength-docs/sows/ssm-deploys-retire-ssh.md`. That's the one
+  secrets backend; don't add another (Vault, SSM Parameter Store, etc.) or
+  widen its scope without a reason that's been agreed.

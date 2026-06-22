@@ -70,14 +70,11 @@ compute = {
   # without absorbing every build/cache spike into an alert.
   root_volume_size = 20
   security_group = {
+    # Inbound SSH (22) intentionally removed: deploys run via SSM Run Command
+    # and operators break-glass via SSM Session Manager, both of which dial
+    # OUT to AWS over 443 — no inbound port needed. See
+    # prog-strength-docs/sows/ssm-deploys-retire-ssh.md.
     ingress_rules = [
-      {
-        description = "SSH"
-        protocol    = "tcp"
-        from_port   = 22
-        to_port     = 22
-        cidr_blocks = ["0.0.0.0/0"]
-      },
       {
         description = "HTTP (Caddy ACME challenge + redirect)"
         protocol    = "tcp"
@@ -114,6 +111,22 @@ ecr = {
   max_image_count = 10
   # Untagged images are build leftovers — short retention is fine.
   untagged_image_expire_days = 1
+}
+
+# --- Backend runtime secrets (Secrets Manager, infra-owned, GitHub-seeded) --
+
+secrets = {
+  # One JSON secret container per backend service under
+  # prog-strength-backend/prod/<service>. Values are seeded from GitHub
+  # secrets by .github/workflows/seed-secrets.yml and are never stored in
+  # Terraform state. The description on each container documents its purpose
+  # and infra-seeded origin so the console reader knows hand-edits get
+  # overwritten by the next seed.
+  services = {
+    api   = "Backend prod app config for the api service. Values seeded from GitHub secrets by prog-strength-infra/seed-secrets.yml; not stored in Terraform state. Consumed by the api container's .env at deploy time."
+    mcp   = "Backend prod app config for the mcp service. Values seeded from GitHub secrets by prog-strength-infra/seed-secrets.yml; not stored in Terraform state. Consumed by the mcp container's .env at deploy time."
+    agent = "Backend prod app config for the agent service. Values seeded from GitHub secrets by prog-strength-infra/seed-secrets.yml; not stored in Terraform state. Consumed by the agent container's .env at deploy time."
+  }
 }
 
 # --- GitHub Actions OIDC (shared CI/CD role) ---------------------------------

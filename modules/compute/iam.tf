@@ -29,3 +29,13 @@ resource "aws_iam_instance_profile" "api" {
   name = "${var.name_prefix}-backend-instance"
   role = aws_iam_role.api_instance.name
 }
+
+# Register the host as an SSM managed node. This is what lets CI deploy via
+# SSM Run Command and operators break-glass via Session Manager with NO
+# inbound SSH — the agent dials out to AWS over 443. AWS-managed policy;
+# mirrors the additive-attachment pattern the ecr/backup modules use against
+# this same role. See prog-strength-docs/sows/ssm-deploys-retire-ssh.md.
+resource "aws_iam_role_policy_attachment" "instance_ssm_core" {
+  role       = aws_iam_role.api_instance.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}

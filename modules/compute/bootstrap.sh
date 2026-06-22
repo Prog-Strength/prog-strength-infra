@@ -35,8 +35,13 @@ apt-get upgrade -y
 # doesn't need this — go-sqlite3 is statically linked into the binary —
 # but having the CLI on the host means an SSH'd operator can run
 # `sqlite3 -readonly ...` without first apt-installing anything.
+#
+# jq is for the on-host deploy scripts (deploy/*.sh): they render each
+# service's compose .env from the Secrets Manager JSON blob via
+# `jq -r 'to_entries[] | "\(.key)=\(.value)"'`, so it must be present
+# system-wide before the first SSM deploy runs.
 
-apt-get install -y sqlite3
+apt-get install -y sqlite3 jq
 
 # AWS CLI v2 for ECR login at deploy time. The deploy workflows SSH in
 # and run `aws ecr get-login-password | docker login ...` against the
@@ -94,6 +99,19 @@ sudo -u ubuntu mkdir -p /home/ubuntu/prog-strength-infra/compose/api/data
 # declare it as `external: true` so they don't try to create or destroy
 # it themselves — its lifecycle belongs here.
 docker network create prog-strength 2>/dev/null || true
+
+# --- SSM agent (deploy transport + break-glass shell) -----------------------
+#
+# Deploys run through SSM Run Command and operators break-glass via SSM
+# Session Manager — there is NO inbound SSH. Recent Ubuntu AMIs ship
+# amazon-ssm-agent preinstalled via snap; enable + start it explicitly so a
+# freshly-bootstrapped host registers as a managed node with no manual step.
+# The instance role (AmazonSSMManagedInstanceCore, attached in
+# modules/compute/iam.tf) is what authorizes registration. Best-effort across
+# snap/systemd packagings so this never fails the bootstrap.
+snap start amazon-ssm-agent 2>/dev/null \
+  || systemctl enable --now amazon-ssm-agent 2>/dev/null \
+  || true
 
 # --- fastfetch (login banner) -----------------------------------------------
 #
