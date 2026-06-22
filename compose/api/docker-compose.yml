@@ -80,12 +80,10 @@ services:
       # must re-consent to Google Calendar. Mint with `openssl rand -base64 32`.
       - CALENDAR_TOKEN_ENC_KEY=${CALENDAR_TOKEN_ENC_KEY:-}
       # PII (real email addresses) — kept env-sourced, never committed to the
-      # public config.toml. BETA_ALLOWED_EMAILS seeds the DB-backed allowlist
-      # on first boot; ADMIN_EMAILS gates the runtime beta-allowlist admin
+      # public config.toml. ADMIN_EMAILS gates the runtime beta-allowlist admin
       # surface (/admin/beta-emails). If ADMIN_EMAILS is unset, that surface is
       # fail-closed (every admin route 403s) and the beta gate runs off the
-      # DB-backed allowlist seeded from BETA_ALLOWED_EMAILS on first boot.
-      - BETA_ALLOWED_EMAILS=${BETA_ALLOWED_EMAILS}
+      # DB-backed allowlist (the sole system of record for the allowlist).
       - ADMIN_EMAILS=${ADMIN_EMAILS}
       # If unset, the API silently falls back to an in-memory TCX archiver
       # (running/server.go) and uploaded TCX files vanish on container restart
