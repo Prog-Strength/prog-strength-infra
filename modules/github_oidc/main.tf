@@ -224,6 +224,27 @@ data "aws_iam_policy_document" "permissions" {
     ]
   }
 
+  # Backend runtime secrets (prog-strength-backend/*). The apply pipeline
+  # creates the containers (CreateSecret/TagResource) and seed-secrets.yml
+  # writes their values (PutSecretValue/DescribeSecret). Scoped to
+  # prog-strength-backend/* so the same role manages every environment's
+  # backend secrets as they are added. Separate from the
+  # prog-strength-developer/* Describe grant above so the two secret families
+  # stay independently auditable. CI seeds values from GitHub; it never reads
+  # them back (no GetSecretValue here — only the instance role reads values).
+  statement {
+    sid = "SecretsManagerBackendManage"
+    actions = [
+      "secretsmanager:CreateSecret",
+      "secretsmanager:TagResource",
+      "secretsmanager:PutSecretValue",
+      "secretsmanager:DescribeSecret",
+    ]
+    resources = [
+      "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:prog-strength-backend/*",
+    ]
+  }
+
   # Fleet run registry (per-SOW dispatch lock) — see
   # prog-strength-docs/sows/fleet-dispatch-gating.md. This one role does
   # double duty on this table:
