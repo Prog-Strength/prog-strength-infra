@@ -1,9 +1,10 @@
 name: Deploy Caddyfile
 
 # Pushes Caddy config changes to the EC2 host without waiting for an api
-# release. The api release workflow also pulls this repo on every deploy,
-# so this workflow only matters when Caddy config changes *between* api
-# releases — e.g. adding a new vhost for the MCP server.
+# release. The api release workflow also pulls this repo on every deploy, so
+# this workflow only matters when Caddy config changes *between* api releases —
+# e.g. adding a new vhost for the MCP server. Runs via SSM Run Command (no SSH,
+# no inbound port 22). See prog-strength-docs/sows/ssm-deploys-retire-ssh.md.
 
 on:
   push:
@@ -14,6 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  id-token: write # mint the OIDC token for configure-aws-credentials
   contents: read
 
 concurrency:
@@ -24,27 +26,58 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Reload Caddy on EC2
-        uses: appleboy/ssh-action@v1.0.3
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            # Abort on the first failing command — see release.yml in the
-            # api repo for the longer story. Short version: without this,
-            # the action reports green even when `caddy reload` errors.
-            set -e
+          role-to-assume: ${{ secrets.AWS_GHA_ROLE_ARN }}
+          aws-region: us-east-2
 
-            cd /home/ubuntu/prog-strength-infra
-            git fetch --prune
-            git checkout main
-            git pull --ff-only
+      - name: Reload Caddy via SSM Run Command
+        run: |
+          set -euo pipefail
 
-            # Reload Caddy in-place so issued Let's Encrypt certs stay
-            # in caddy_data and active connections aren't dropped. The
-            # config path matches the bind-mount target in the api's
-            # docker-compose.yml.
-            cd /home/ubuntu/prog-strength-api
-            docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
-            docker compose ps caddy
+          command_id="$(aws ssm send-command \
+            --document-name AWS-RunShellScript \
+            --comment "Reload Caddy" \
+            --targets "Key=tag:Name,Values=prog-strength-prod-backend" \
+            --parameters commands="sudo -u ubuntu -H bash /home/ubuntu/prog-strength-infra/deploy/caddy-reload.sh" \
+            --query 'Command.CommandId' --output text)"
+          echo "SSM command dispatched: ${command_id}"
+
+          instance_id=""
+          for _ in $(seq 1 30); do
+            instance_id="$(aws ssm list-command-invocations \
+              --command-id "${command_id}" \
+              --query 'CommandInvocations[0].InstanceId' --output text)"
+            [ -n "${instance_id}" ] && [ "${instance_id}" != "None" ] && break
+            sleep 2
+          done
+          if [ -z "${instance_id}" ] || [ "${instance_id}" = "None" ]; then
+            echo "No SSM invocation registered for command ${command_id}" >&2
+            exit 1
+          fi
+          echo "Running on instance: ${instance_id}"
+
+          while true; do
+            status="$(aws ssm get-command-invocation \
+              --command-id "${command_id}" --instance-id "${instance_id}" \
+              --query 'Status' --output text)"
+            case "${status}" in
+              Success) break ;;
+              Pending | InProgress | Delayed) sleep 5 ;;
+              *)
+                echo "Caddy reload failed with status: ${status}" >&2
+                aws ssm get-command-invocation \
+                  --command-id "${command_id}" --instance-id "${instance_id}" \
+                  --query 'StandardErrorContent' --output text >&2 || true
+                aws ssm get-command-invocation \
+                  --command-id "${command_id}" --instance-id "${instance_id}" \
+                  --query 'StandardOutputContent' --output text || true
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "Caddy reloaded."
+          aws ssm get-command-invocation \
+            --command-id "${command_id}" --instance-id "${instance_id}" \
+            --query 'StandardOutputContent' --output text
