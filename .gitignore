@@ -1,6 +1,13 @@
 # Terraform
 .terraform/
+# Lock files: ignore the module-level ones (local `init` artifacts), but COMMIT
+# the root lock so CI and every machine resolve identical provider versions and
+# hashes. Leaving the root lock ignored let `terraform init` re-resolve `~> 6.0`
+# to a newer release on each run, which is how prod state drifted ahead of CI.
+# Provider upgrades are now an explicit PR that updates the root lock — refresh
+# with `terraform providers lock -platform=linux_amd64 -platform=darwin_arm64`.
 .terraform.lock.hcl
+!/.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 *.tfplan

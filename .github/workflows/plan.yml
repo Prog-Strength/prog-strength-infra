@@ -33,7 +33,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.13.0
+          terraform_version: 1.14.7
 
       # Gating checks — these failing is an unambiguous "do not merge" signal,
       # so they run before plan to fail fast and avoid posting a confusing
