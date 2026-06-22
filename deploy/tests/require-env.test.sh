@@ -56,6 +56,12 @@ OPTIONAL_THING=
 EOF
 check 0 "unchecked empty optional ignored" "$tmp" JWT_SIGNING_KEY
 
+# Case 7: no keys requested -> rc 0 (nothing to validate)
+check 0 "zero keys always passes" "$tmp"
+
+# Case 6: a non-existent env file -> rc 1 (key cannot be found)
+check 1 "missing file fails" /nonexistent/require-env-test-path JWT_SIGNING_KEY
+
 if [ "$failures" -gt 0 ]; then
   echo "${failures} test(s) failed"; exit 1
 fi
