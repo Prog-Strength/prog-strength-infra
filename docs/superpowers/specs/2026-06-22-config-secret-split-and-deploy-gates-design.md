@@ -113,11 +113,12 @@ render .env  ->  validate required keys present & non-empty  ->  docker compose 
   ->  docker compose down  ->  docker compose up -d
 ```
 
-The validation step runs **after** the image pull but **before** `down`, so a
-missing required value aborts the deploy with the running stack intact. A small
-helper reads `.env`, checks each required key has a non-empty value, and on any
-miss prints the offending keys to stderr and exits non-zero (which SSM surfaces
-as `Failed`).
+The validation step runs immediately **after** `.env` is rendered and **before**
+the image pull and `down`, so a missing required value aborts the deploy with the
+running stack intact (and without even pulling). A small sourced helper
+(`deploy/lib/require-env.sh`) reads `.env`, checks each required key has a
+non-empty value, and on any miss prints the offending keys to stderr and returns
+non-zero (which `set -e` propagates and SSM surfaces as `Failed`).
 
 `SECRET_ID` and the existing umask/secret-render logic are unchanged except that
 the secret blob now contains only the 10 secrets (the absent config keys come
