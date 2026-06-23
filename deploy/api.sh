@@ -14,7 +14,6 @@ set -euo pipefail
 # of the working directory (the script cd's into compose/api below).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=deploy/lib/require-env.sh
-# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib/require-env.sh"
 
 RELEASE_VERSION="${1:?usage: api.sh <version>  (e.g. v0.22.0 or 0.22.0)}"

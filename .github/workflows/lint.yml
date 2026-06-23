@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: shellcheck
-        # shellcheck is preinstalled on ubuntu-latest runners. bootstrap.sh
-        # is the only shell in the repo (a Terraform templatefile); its
-        # template-artifact findings are suppressed by an in-file directive.
-        run: shellcheck modules/compute/bootstrap.sh
+        # shellcheck is preinstalled on ubuntu-latest runners. Covers the
+        # Terraform bootstrap templatefile and the on-host deploy scripts +
+        # their sourced lib and tests. -x follows `source` directives.
+        run: shellcheck -x modules/compute/bootstrap.sh deploy/*.sh deploy/lib/*.sh deploy/tests/*.sh
