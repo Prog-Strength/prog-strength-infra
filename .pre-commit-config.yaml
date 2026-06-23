@@ -52,6 +52,9 @@ repos:
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.10.0
     hooks:
-      # Fast — runs on commit. bootstrap.sh is the only shell in the repo.
+      # Fast — runs on commit. Covers bootstrap.sh and the deploy/ scripts,
+      # lib, and tests (shellcheck auto-detects shell files). -x follows
+      # `source` directives into deploy/lib/.
       - id: shellcheck
         stages: [pre-commit]
+        args: [-x]
