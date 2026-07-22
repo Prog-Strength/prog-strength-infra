@@ -79,6 +79,13 @@ services:
       # rotating this key invalidates every stored refresh token — users
       # must re-consent to Google Calendar. Mint with `openssl rand -base64 32`.
       - CALENDAR_TOKEN_ENC_KEY=${CALENDAR_TOKEN_ENC_KEY:-}
+      # WHOOP recovery integration (optional — empty disables it). client_id is
+      # deployment-bound config (config.env); the secret doubles as the webhook
+      # HMAC key; token_enc_key is a base64 32-byte AES key encrypting stored
+      # Whoop refresh tokens at rest. Mint with `openssl rand -base64 32`.
+      - WHOOP_CLIENT_ID=${WHOOP_CLIENT_ID:-}
+      - WHOOP_CLIENT_SECRET=${WHOOP_CLIENT_SECRET:-}
+      - WHOOP_TOKEN_ENC_KEY=${WHOOP_TOKEN_ENC_KEY:-}
       # PII (real email addresses) — kept env-sourced, never committed to the
       # public config.toml. ADMIN_EMAILS gates the runtime beta-allowlist admin
       # surface (/admin/beta-emails). If ADMIN_EMAILS is unset, that surface is
