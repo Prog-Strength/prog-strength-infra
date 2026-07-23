@@ -1,0 +1,474 @@
+{
+  "title": "WHOOP Integration",
+  "uid": "ps-whoop",
+  "tags": ["prog-strength"],
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {"from": "now-24h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "transparent": true,
+      "gridPos": {"h": 3, "w": 24, "x": 0, "y": 0},
+      "options": {
+        "mode": "markdown",
+        "content": "### WHOOP Integration\nWHOOP **pushes** recovery data to us (webhook → recent-window re-sync), so nobody is staring at a broken page when ingestion dies — this dashboard is the watcher. The healthy shape: webhooks arrive → syncs succeed → rows land, roughly once per user per morning, plus one token refresh per active hour. Sections: **Webhook ingestion** (deliveries, failures, rejects) · **Syncs & data landed** (attempts and row dispositions — `upserted=0` on green syncs is the classic silent failure) · **Token lifecycle & HTTP surface** (refresh outcomes are the early warning for \"my WHOOP stopped syncing\"). Dashed yellow / red lines mark warning and critical levels for future alerts. Hover any panel's title (ⓘ) for details; series names match the `whoopsync` structured-log fields, so a spike greps straight to its log lines."
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Successful syncs (24h)",
+      "description": "Count of syncs (webhook-triggered window syncs + connect-time backfills) that completed OK in the last 24h. This is the ingestion heartbeat: with any connected user it should be ≥ 1 every morning. ZERO here while the app is healthy means ingestion is dead — webhook registration lapsed, WHOOP-side outage, or every sync failing (check the panels below). Red at 0 by design; this is the number a future 'ingestion dead' alert should watch.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 3},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(api_whoop_syncs_total{result=\"ok\"}[24h])) or vector(0)",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "green", "value": 1}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Recovery rows upserted (24h)",
+      "description": "Recovery records actually written in the last 24h. This is the ground truth the dashboard card feeds from — syncs can report OK while writing nothing (the v0.79.x scope bug looked exactly like that from the outside). Yellow at 0: with one connected user a quiet day is possible (late wake, unscored recovery), but a second consecutive zero-day deserves a look at 'Rows by disposition' below.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 3},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(api_whoop_sync_rows_total{disposition=\"upserted\"}[24h])) or vector(0)",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "yellow", "value": null},
+              {"color": "green", "value": 1}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Webhook failures (24h)",
+      "description": "Deliveries that returned 500 to WHOOP in the last 24h (sync_error, delete_error, route_error). WHOOP retries these 5× over ~an hour and the handler is idempotent, so a lone blip that later succeeds is survivable — but each one has a matching ERROR log line worth reading. Warning at 1, critical at 3 (mirrors the API dashboard's every-5xx-matters stance).",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 3},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(api_whoop_webhooks_total{outcome=~\"sync_error|delete_error|route_error\"}[24h])) or vector(0)",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 3}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Token refresh problems (24h)",
+      "description": "Refresh attempts in the last 24h that ended invalid_grant (connection flipped to error; the user must reconnect from Settings → Integrations) or persist_error (WHOOP rotated the single-use refresh token but we failed to store the new pair — the connection is likely orphaned). Warning at 1, critical at 2. persist_error specifically always deserves a look at its ERROR log line.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 3},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(api_whoop_token_refreshes_total{result=~\"invalid_grant|persist_error\"}[24h])) or vector(0)",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 1},
+              {"color": "red", "value": 2}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "Webhook ingestion",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 7},
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Webhook deliveries by outcome",
+      "description": "Every delivery to POST /webhooks/whoop per trailing 5-minute window, by outcome. Healthy traffic is a morning pulse of `synced` per connected user (WHOOP scores recovery on wake). `unknown_user` means WHOOP still holds a registration for an account we have no connection row for; `not_connected` means events for a revoked/error connection — both are dropped with a 204 on purpose so WHOOP stops retrying. A steady stream of either means a WHOOP-side registration outlived its local connection.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (outcome) (increase(api_whoop_webhooks_total[5m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Webhook failures & rejects",
+      "description": "The bad subset: sync_error / delete_error / route_error returned 500 to WHOOP (its retry will re-attempt; each has an ERROR log line), while bad_signature / bad_json were rejected before doing any work. bad_signature is the one to watch separately — more than a stray hit means either the client secret rotated out from under the webhook config, or someone is probing the public endpoint. Dashed yellow / red lines mark the warning (1) and critical (3) thresholds a future alert should use.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (outcome) (increase(api_whoop_webhooks_total{outcome=~\"sync_error|delete_error|route_error|bad_signature|bad_json\"}[5m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(1)",
+          "legendFormat": "warning (1)",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(3)",
+          "legendFormat": "critical (3)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "softMax": 4
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (1)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "critical (3)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": "row",
+      "title": "Syncs & data landed",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 16},
+      "panels": []
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Sync attempts by kind & result",
+      "description": "Every sync run per trailing 5-minute window. `window/ok` is the webhook-driven steady state; `backfill/*` appears once per connect (30-day pull). Errors here while webhooks ARE arriving point at the WHOOP data API or our token handling — scope problems, 401s, rate limits — not at delivery; each error carries the sync's wrapped error chain in an ERROR log line. Dashed yellow / red lines mark the warning (1) and critical (3) levels for error-series alerts.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (kind, result) (increase(api_whoop_syncs_total[5m]))",
+          "legendFormat": "{{kind}} / {{result}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(1)",
+          "legendFormat": "warning (1)",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(3)",
+          "legendFormat": "critical (3)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "softMax": 4
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (1)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "critical (3)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Recovery rows by disposition",
+      "description": "What each sync did with the records it fetched, per trailing 1-hour window. `upserted` is data landing (a connect-time backfill shows as a burst of ~30). The skipped_* series are data-quality signals, not errors: skipped_unscored = WHOOP hasn't scored the recovery yet (a later webhook brings it back), skipped_no_cycle = the recovery's cycle fell outside the fetched window, skipped_bad_date = a cycle we couldn't derive a calendar date from (each has a WARN log with the cycle id). A sustained skipped-heavy mix with no upserts is the 'sync green, dashboard empty' failure shape.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (disposition) (increase(api_whoop_sync_rows_total[1h]))",
+          "legendFormat": "{{disposition}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "row",
+      "title": "Token lifecycle & HTTP surface",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 25},
+      "panels": []
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Token refreshes by result",
+      "description": "WHOOP access tokens live ~1h and refresh tokens are single-use, so `ok` refreshes are the connection's pulse — roughly one per active user-hour. `invalid_grant` is the transition behind every \"my WHOOP stopped syncing\" report: the connection flips to error and stays dead until the user reconnects. `persist_error` is rarer and worse: WHOOP already rotated the token but we failed to store the new pair, likely orphaning the connection. Dashed yellow (1) / red (2) lines mark alert levels for the failure series.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 26},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (result) (increase(api_whoop_token_refreshes_total[1h]))",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(1)",
+          "legendFormat": "warning (1)",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(2)",
+          "legendFormat": "critical (2)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "softMax": 3
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (1)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "critical (2)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "5xx on WHOOP routes",
+      "description": "Server errors on the WHOOP-owned HTTP surface (OAuth connect/callback, connection status, recovery reads, and the webhook endpoint) per trailing 5-minute window — the user-facing failures, as opposed to the background ingestion the rest of this dashboard watches. A 500 on /auth/whoop/callback is a user watching their connect attempt die. Every envelope's request_id joins to its ERROR log line. Dashed yellow / red lines mark the warning (1) and critical (3) thresholds.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 26},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (route) (increase(ps_http_requests_total{status=~\"5..\", route=~\"/auth/whoop/.*|/me/whoop/connection|/whoop/recovery|/webhooks/whoop\"}[5m]))",
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(1)",
+          "legendFormat": "warning (1)",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "vector(3)",
+          "legendFormat": "critical (3)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "softMax": 4
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "warning (1)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "critical (3)"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "WHOOP route traffic (by route)",
+      "description": "Request rate across the WHOOP HTTP surface. The webhook route is WHOOP calling us (its cadence should match 'Webhook deliveries' above); /me/whoop/connection is the Settings page polling status; /whoop/recovery is the dashboard card and the agent's MCP tool reading data; the /auth/whoop/* pair should appear only when someone connects or reconnects — a burst there outside a known connect is worth a look.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 34},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (route) (rate(ps_http_requests_total{route=~\"/auth/whoop/.*|/me/whoop/connection|/whoop/recovery|/webhooks/whoop\"}[5m]))",
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
