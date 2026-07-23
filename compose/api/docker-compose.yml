@@ -120,6 +120,15 @@ services:
       # ships; empty values leave it dormant.
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Whoop device integration (config.toml [whoop] references these as
+      # ${VAR} labels). Optional: an empty WHOOP_TOKEN_ENC_KEY disables the
+      # integration. The client secret doubles as the webhook HMAC key.
+      # Rotating WHOOP_TOKEN_ENC_KEY invalidates every stored Whoop token —
+      # users must reconnect. Mint with `openssl rand -base64 32`. See
+      # prog-strength-docs/sows/whoop-integration.md.
+      - WHOOP_CLIENT_ID=${WHOOP_CLIENT_ID:-}
+      - WHOOP_CLIENT_SECRET=${WHOOP_CLIENT_SECRET:-}
+      - WHOOP_TOKEN_ENC_KEY=${WHOOP_TOKEN_ENC_KEY:-}
     volumes:
       # Persist SQLite database on host. Resolves to the directory next to
       # this compose file (prog-strength-infra/compose/api/data on prod).
