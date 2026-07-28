@@ -81,6 +81,17 @@ services:
       # login. The deploy seeds a strong password from secrets; the
       # nag would just be noise on a single-user beta.
       - GF_SECURITY_DISABLE_INITIAL_ADMIN_PASSWORD_CHANGE=true
+      # Public base URL so alert notifications carry working dashboard
+      # links instead of localhost ones.
+      - GF_SERVER_ROOT_URL=https://monitoring.progstrength.fitness
+      # Slack incoming-webhook URL, interpolated by Grafana into
+      # provisioning/alerting/contact-points.yml at startup. Prod value is
+      # a true secret (Secrets Manager → .env, required by deploy/api.sh's
+      # REQUIRED_ENV_KEYS gate). The fallback is a syntactically valid but
+      # dead URL for local dev only — Grafana refuses to start when a slack
+      # contact point's url is empty, and prod can't fall through to it
+      # because the deploy gate fails first.
+      - SLACK_ALERTS_WEBHOOK_URL=${SLACK_ALERTS_WEBHOOK_URL:-https://hooks.slack.com/services/LOCAL/DEV/placeholder}
     volumes:
       # Provisioning auto-creates the Prometheus datasource and
       # registers the dashboards directory at startup. No clicks

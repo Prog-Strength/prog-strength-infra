@@ -1,0 +1,37 @@
+# Shared Slack notification templates — the ONE place the alert message
+# format lives. Every contact point references ps.title / ps.text, so a
+# formatting change here applies to all current and future monitors.
+#
+# Keep `$` out of this file: Grafana expands $VAR / ${VAR} in provisioning
+# files against the container environment (that's how the webhook URL is
+# injected in contact-points.yml). All dynamic rendering below uses Go
+# template dot-context only (.Alerts, .Labels, .Annotations, .ValueString),
+# which survives env expansion untouched.
+#
+# Message shape (Slack mrkdwn):
+#   title:  🚨 [FIRING] <alertname>          (or ✅ [RESOLVED] …)
+#   body:   one block per alert instance — severity, summary annotation,
+#           every non-housekeeping label (e.g. stage=distill), the observed
+#           value, and a dashboard link when the rule carries
+#           __dashboardUid__.
+
+apiVersion: 1
+
+templates:
+  - orgId: 1
+    name: ps-slack
+    template: |
+      {{ define "ps.title" -}}
+      {{ if eq .Status "firing" }}🚨 [FIRING]{{ else }}✅ [RESOLVED]{{ end }} {{ .CommonLabels.alertname }}
+      {{- end }}
+
+      {{ define "ps.text" -}}
+      {{ range .Alerts }}
+      {{ if eq .Status "firing" }}:red_circle:{{ else }}:large_green_circle:{{ end }} *{{ .Labels.alertname }}*{{ if .Labels.severity }} — severity: *{{ .Labels.severity }}*{{ end }}
+      {{ if .Annotations.summary }}{{ .Annotations.summary }}{{ end }}
+      {{ range .Labels.SortedPairs }}{{ if and (ne .Name "alertname") (ne .Name "grafana_folder") (ne .Name "severity") }}• {{ .Name }}: `{{ .Value }}`
+      {{ end }}{{ end -}}
+      Observed: {{ .ValueString }}
+      {{ if .DashboardURL }}<{{ .DashboardURL }}|View dashboard>{{ end }}
+      {{ end }}
+      {{- end }}
