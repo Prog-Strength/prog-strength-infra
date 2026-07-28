@@ -1,5 +1,5 @@
 {
-  "title": "ps-vector-memory",
+  "title": "Vector Memory Distillation",
   "uid": "ps-vector-memory",
   "tags": [
     "prog-strength"
@@ -18,14 +18,14 @@
       "title": "",
       "transparent": true,
       "gridPos": {
-        "h": 4,
+        "h": 5,
         "w": 24,
         "x": 0,
         "y": 0
       },
       "options": {
         "mode": "markdown",
-        "content": "### ps-vector-memory\nThe background distillation goroutine in the **api** job: every five minutes it finds idle chat sessions, distills them into durable user facts via Anthropic, embeds them via OpenAI, and writes them to sqlite-vec. It **degrades silently** \u2014 if it stops, no request fails and nothing pages \u2014 so the top-left **Time since last successful sweep** tile is the one to watch; everything else explains _why_ it's behaving as it is. Sections: **Liveness & cadence** (is it running?) \u00b7 **Work done** (is it producing memories?) \u00b7 **Failures** (where is it breaking?) \u00b7 **Latency & cost** (how long, and how many tokens?). Hover any panel's title (\u24d8) for details and threshold meanings. Thresholds are starting proposals, trivially retunable."
+        "content": "### Vector Memory Distillation\nThe background distillation goroutine in the **api** job: every five minutes it finds idle chat sessions and turns them into durable user memories.\n\n**Pipeline:** select idle sessions \u2192 load transcripts \u2192 **distill** into observations (Anthropic) \u2192 **embed** (OpenAI) \u2192 **dedup** against existing memories \u2192 **insert** into sqlite-vec \u2192 **mark** the session done.\n\nIt **degrades silently** \u2014 if it stops, no request fails \u2014 so the top-left **Time since last successful sweep** tile is the one to watch; everything else explains _why_. Stage errors page Slack (warning \u22651/h, critical \u22653/h per stage \u2014 see `alerting/rules-vector-memory.yml`). Hover any panel's title (\u24d8) for details; thresholds are starting proposals, trivially retunable."
       }
     },
     {
@@ -37,9 +37,25 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 5
       },
       "panels": []
+    },
+    {
+      "id": 22,
+      "type": "text",
+      "title": "",
+      "transparent": true,
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Is the sweeper running at all?** The goroutine ticks every five minutes: expect ~288 sweeps per 24h and ~3 per 15-minute bucket in *Sweep outcomes*. **Time since last successful sweep** is the headline tile \u2014 minutes are fine, hours mean the loop is stalled or every sweep is failing. **Idle backlog** is the queue at the start of the latest sweep; a backlog that grows while sweep counts stay normal means sweeps run but aren't clearing work."
+      }
     },
     {
       "id": 3,
@@ -54,7 +70,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 5
+        "y": 9
       },
       "targets": [
         {
@@ -117,7 +133,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 5
+        "y": 9
       },
       "targets": [
         {
@@ -180,7 +196,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 5
+        "y": 9
       },
       "targets": [
         {
@@ -243,7 +259,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 9
+        "y": 13
       },
       "targets": [
         {
@@ -281,9 +297,25 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 21
       },
       "panels": []
+    },
+    {
+      "id": 23,
+      "type": "text",
+      "title": "",
+      "transparent": true,
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Is it producing memories?** Each distilled session yields observations, and every observation lands as either **inserted** (a new durable memory) or **deduped** (near-duplicate of one already held): `inserted + deduped \u2248 distilled`. *Selected vs. distilled* should track together \u2014 a persistent gap means sessions enter batches but die before the mark step. Heavy deduping is healthy; zero inserts *and* zero dedups while sessions keep distilling is not."
+      }
     },
     {
       "id": 8,
@@ -298,7 +330,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 18
+        "y": 25
       },
       "targets": [
         {
@@ -348,7 +380,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 18
+        "y": 25
       },
       "targets": [
         {
@@ -398,7 +430,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 18
+        "y": 25
       },
       "targets": [
         {
@@ -448,7 +480,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 22
+        "y": 29
       },
       "targets": [
         {
@@ -491,7 +523,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 22
+        "y": 29
       },
       "targets": [
         {
@@ -539,9 +571,25 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 30
+        "y": 37
       },
       "panels": []
+    },
+    {
+      "id": 24,
+      "type": "text",
+      "title": "",
+      "transparent": true,
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 38
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Where is it breaking?** Errors per hour by pipeline stage. `distill` failures point at Anthropic, `embed` at OpenAI; the remaining stages (select / load / dedup / insert / mark) are local sqlite and session-store work. The dashed lines on *Stage errors* are the same thresholds that page Slack: warning at \u22651 error/hour, critical at \u22653/hour, per stage (provisioned in `monitoring/grafana/provisioning/alerting/rules-vector-memory.yml`)."
+      }
     },
     {
       "id": 14,
@@ -556,7 +604,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 31
+        "y": 41
       },
       "targets": [
         {
@@ -661,7 +709,7 @@
         "h": 4,
         "w": 6,
         "x": 12,
-        "y": 31
+        "y": 41
       },
       "targets": [
         {
@@ -724,7 +772,7 @@
         "h": 4,
         "w": 6,
         "x": 18,
-        "y": 31
+        "y": 41
       },
       "targets": [
         {
@@ -783,9 +831,25 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 39
+        "y": 49
       },
       "panels": []
+    },
+    {
+      "id": 25,
+      "type": "text",
+      "title": "",
+      "transparent": true,
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Is it slow or expensive?** Provider-call percentiles carry dashed warning / critical lines (distill 10s / 20s, embed 2s / 5s). *Sweep duration* (60s / 120s) matters against the five-minute tick \u2014 a sweep nearing five minutes starts eating its own schedule. *Token spend* is the cost meter: Anthropic distill tokens (input / output) plus OpenAI embed tokens, per second."
+      }
     },
     {
       "id": 18,
@@ -800,7 +864,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 40
+        "y": 53
       },
       "targets": [
         {
@@ -912,7 +976,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 40
+        "y": 53
       },
       "targets": [
         {
@@ -1024,7 +1088,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 48
+        "y": 61
       },
       "targets": [
         {
@@ -1136,7 +1200,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 48
+        "y": 61
       },
       "targets": [
         {
