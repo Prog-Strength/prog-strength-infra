@@ -1,0 +1,106 @@
+# Vector Memory distillation pipeline alerts. Mirrors the "Stage errors"
+# panel on the ps-vector-memory dashboard (panel 14), which draws reference
+# lines at warning=1 and critical=3 errors/hour per stage — these rules make
+# those lines actually page instead of just decorating the chart.
+#
+# Both rules evaluate the same per-stage instant query the panel plots:
+#   sum by (stage) (increase(api_vectormemory_stage_errors_total[1h]))
+# so a firing alert names the failing stage (distill, embed, …).
+#
+# Thresholds are 0.5 / 2.5 rather than 1 / 3 because increase() extrapolates
+# and can report ~0.97 for a single error; the midpoints make "1 error" and
+# "3 errors" cross reliably. When critical fires, warning fires too —
+# accepted (Grafana alerting has no inhibition); severity is explicit in the
+# Slack message either way.
+#
+# for: 0s — the 1h increase() window already smooths; extra debounce would
+#   only delay the page.
+# noDataState: OK — the counter series may not exist until the first error
+#   is ever recorded; absence must not alert. (Detecting a fully-dead
+#   pipeline is a separate liveness monitor — time since last sweep.)
+# execErrState: Alerting — a broken query (e.g. metric renamed) should
+#   surface loudly, per this repo's fail-loud philosophy.
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: vector-memory
+    folder: Prog Strength Alerts
+    interval: 1m
+    rules:
+      - uid: vm-stage-errors-warning
+        title: Vector Memory stage errors — warning
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum by (stage) (increase(api_vectormemory_stage_errors_total[1h]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        labels:
+          severity: warning
+          service: vector-memory
+        annotations:
+          summary: >-
+            A Vector Memory distillation stage recorded at least 1 error in
+            the last hour (warning threshold).
+          __dashboardUid__: ps-vector-memory
+          __panelId__: "14"
+
+      - uid: vm-stage-errors-critical
+        title: Vector Memory stage errors — critical
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum by (stage) (increase(api_vectormemory_stage_errors_total[1h]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [2.5]
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        labels:
+          severity: critical
+          service: vector-memory
+        annotations:
+          summary: >-
+            A Vector Memory distillation stage recorded 3 or more errors in
+            the last hour (critical threshold).
+          __dashboardUid__: ps-vector-memory
+          __panelId__: "14"

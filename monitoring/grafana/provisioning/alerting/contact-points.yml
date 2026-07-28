@@ -1,0 +1,26 @@
+# Slack delivery for all alerts. One incoming-webhook contact point, one
+# channel; severity is conveyed in the message (see templates.yml), not by
+# channel. Future monitors reuse this contact point via the root policy in
+# policies.yml — new rules files need no changes here.
+#
+# $SLACK_ALERTS_WEBHOOK_URL is expanded by Grafana at startup from the
+# container environment. In prod it flows GH secret → seed-secrets.yml →
+# Secrets Manager → deploy/api.sh .env (gated in REQUIRED_ENV_KEYS) →
+# docker-compose.monitoring.yml. Local dev falls back to a dead placeholder
+# URL there — Grafana refuses to start if this field is empty.
+
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: slack-alerts
+    receivers:
+      - uid: slack-alerts-webhook
+        type: slack
+        settings:
+          url: $SLACK_ALERTS_WEBHOOK_URL
+          title: '{{ template "ps.title" . }}'
+          text: '{{ template "ps.text" . }}'
+        # Post recovery messages too, so the channel shows when an incident
+        # ended without someone checking the dashboard.
+        disableResolveMessage: false

@@ -1,0 +1,19 @@
+# Root notification policy: every alert goes to Slack. Grouping by folder +
+# alertname means the warning and critical rules for the same subsystem
+# arrive as separate messages, while multiple instances of one rule (e.g.
+# stage=distill and stage=embed firing together) share a single message.
+#
+# repeat_interval keeps a still-firing alert re-posting every 4h — an unfixed
+# incident should nag, not notify once and scroll away.
+
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: slack-alerts
+    group_by:
+      - grafana_folder
+      - alertname
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
