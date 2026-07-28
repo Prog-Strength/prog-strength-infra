@@ -1,0 +1,105 @@
+# API server-error alerts. Mirrors the "5xx errors by route" panel on the
+# API Health dashboard (uid ps-api, panel 13), which draws warning=1 and
+# critical=3 reference lines over per-route 5-minute error counts. For this
+# low-traffic app the raw count matters more than the ratio — one error is
+# worth a look, three or more is a real problem (same rationale as the
+# panel's description). 4xx are deliberately excluded: client errors, not
+# ours.
+#
+# Both rules evaluate the query the panel plots:
+#   sum by (route) (increase(ps_http_requests_total{status=~"5.."}[5m]))
+# so a firing alert names the failing route.
+#
+# Thresholds are 0.5 / 2.5 rather than 1 / 3 — increase() extrapolates and
+# can report ~0.97 for a single error (see alerting/README.md).
+#
+# for: 0s — a single 5xx should page promptly; the 5m window is the only
+#   smoothing, which also means an isolated blip auto-resolves ~5 minutes
+#   later. Fire/resolve pairs in Slack mark each error burst.
+# noDataState: OK — the status=~"5.." series only exists after a 5xx has
+#   ever been served; absence is the healthy state.
+# execErrState: Alerting — a broken query (metric renamed) surfaces loudly.
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: api
+    folder: Prog Strength Alerts
+    interval: 1m
+    rules:
+      - uid: api-5xx-warning
+        title: API 5xx errors — warning
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum by (route) (increase(ps_http_requests_total{status=~"5.."}[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: >-
+            An API route returned at least 1 server error (5xx) in the last
+            5 minutes (warning threshold).
+          __dashboardUid__: ps-api
+          __panelId__: "13"
+
+      - uid: api-5xx-critical
+        title: API 5xx errors — critical
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum by (route) (increase(ps_http_requests_total{status=~"5.."}[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [2.5]
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: >-
+            An API route returned 3 or more server errors (5xx) in the last
+            5 minutes (critical threshold).
+          __dashboardUid__: ps-api
+          __panelId__: "13"
