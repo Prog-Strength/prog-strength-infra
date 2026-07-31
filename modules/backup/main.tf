@@ -77,19 +77,31 @@ resource "aws_s3_bucket_lifecycle_configuration" "litestream" {
 
 data "aws_iam_policy_document" "litestream" {
   # Bucket-level: Litestream lists generations to decide what to write/restore.
+  # ListBucketVersions and ListBucketMultipartUploads serve the S3 footprint
+  # exporter (monitoring/s3_exporter). Litestream rewrites WAL segments
+  # constantly and this bucket is versioned with a 30-day noncurrent
+  # expiration, so noncurrent versions can outweigh current ones — a footprint
+  # number that ignored them would be badly wrong here specifically.
   statement {
-    effect    = "Allow"
-    actions   = ["s3:ListBucket"]
+    effect = "Allow"
+    actions = [
+      "s3:ListBucket",
+      "s3:ListBucketVersions",
+      "s3:ListBucketMultipartUploads",
+    ]
     resources = [aws_s3_bucket.litestream.arn]
   }
 
   # Object-level: read, write, and prune (delete) generations under any key.
+  # ListMultipartUploadParts is the exporter's — sizing an incomplete upload
+  # means listing its parts, since ListMultipartUploads reports existence only.
   statement {
     effect = "Allow"
     actions = [
       "s3:GetObject",
       "s3:PutObject",
       "s3:DeleteObject",
+      "s3:ListMultipartUploadParts",
     ]
     resources = ["${aws_s3_bucket.litestream.arn}/*"]
   }

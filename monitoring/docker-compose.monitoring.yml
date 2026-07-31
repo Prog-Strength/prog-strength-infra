@@ -49,6 +49,22 @@ services:
       - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers)($$|/)"
     restart: unless-stopped
 
+  # Scans the five Prog Strength S3 buckets every 15 minutes and serves
+  # footprint gauges on :9103 (scraped over the compose network — no host
+  # port). Built from this repo's checkout on the host; AWS credentials come
+  # from the instance profile via IMDS, so no keys are involved.
+  #
+  # The 15-minute cadence is deliberately far slower than Prometheus's 15s
+  # scrape: LIST requests cost money per request, and the footprint of a
+  # single-user app does not move between scrapes.
+  s3_exporter:
+    build:
+      context: ${PROG_STRENGTH_INFRA_DIR:-/home/ubuntu/prog-strength-infra}/monitoring/s3_exporter
+    environment:
+      - AWS_REGION=us-east-2
+      - S3_EXPORTER_REFRESH_SECONDS=900
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:12.2.1
     # Reverse-proxied at https://monitoring.progstrength.fitness by

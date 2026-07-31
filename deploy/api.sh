@@ -83,7 +83,11 @@ COMPOSE_FILES=(-f docker-compose.yml -f /home/ubuntu/prog-strength-infra/monitor
 # we tear down the running stack.
 docker compose "${COMPOSE_FILES[@]}" pull api
 docker compose "${COMPOSE_FILES[@]}" down
-docker compose "${COMPOSE_FILES[@]}" up -d
+# --build is required by the monitoring stack's s3_exporter, which is built
+# from this repo's checkout rather than pulled from a registry. Without it
+# compose builds the image only when it is missing, so an exporter code change
+# would deploy green and silently keep running the old code.
+docker compose "${COMPOSE_FILES[@]}" up -d --build
 
 echo "Deployed ${RELEASE_VERSION}"
 docker compose "${COMPOSE_FILES[@]}" ps

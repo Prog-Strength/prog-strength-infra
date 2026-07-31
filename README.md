@@ -154,6 +154,30 @@ with `aws iam get-open-id-connect-provider`.
 | ------------------ | ----------- | ------------------------------------------------ |
 | `oidc_thumbprints` | _(required)_ | Must match the imported provider's thumbprints. |
 
+## Monitoring
+
+The backend host also runs a Prometheus/Grafana stack as compose services
+(`monitoring/docker-compose.monitoring.yml`), merged into the deploy by
+`deploy/api.sh`. Most of it is off-the-shelf images wired together by
+provisioning config; the one piece of application code is below.
+
+### S3 footprint exporter
+
+`monitoring/s3_exporter/` scans the five application buckets every 15 minutes
+and serves `ps_s3_*` gauges on `:9103` for Prometheus. The bucket list lives in
+`monitoring/s3_exporter/buckets.yml` and must be updated when a bucket is added
+or renamed in `environments/prod.tfvars`.
+
+Tuning knobs (compose service env, `docker-compose.monitoring.yml`):
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `S3_EXPORTER_REFRESH_SECONDS` | `900` | Seconds between full scans. Raise it if scan duration climbs — LIST requests are billed per request. |
+| `S3_EXPORTER_PORT` | `9103` | Must match the Prometheus scrape target. |
+| `S3_EXPORTER_CONFIG` | `buckets.yml` | Path to the bucket list inside the image. |
+
+Run the tests with `python3 -m pytest monitoring/s3_exporter/tests -q`.
+
 ## Outputs
 
 | Output                        | Use                                                                     |

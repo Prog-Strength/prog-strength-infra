@@ -117,9 +117,18 @@ resource "aws_s3_bucket_lifecycle_configuration" "activity_videos" {
 # is what makes playback URLs work.
 
 data "aws_iam_policy_document" "activity_videos" {
+  # ListBucketVersions and ListBucketMultipartUploads serve the S3 footprint
+  # exporter (monitoring/s3_exporter). This bucket is not versioned today, but
+  # the exporter uses ListObjectVersions uniformly across all five buckets so
+  # that enabling versioning later cannot silently make the dashboard
+  # under-report.
   statement {
-    effect    = "Allow"
-    actions   = ["s3:ListBucket"]
+    effect = "Allow"
+    actions = [
+      "s3:ListBucket",
+      "s3:ListBucketVersions",
+      "s3:ListBucketMultipartUploads",
+    ]
     resources = [aws_s3_bucket.activity_videos.arn]
   }
 
@@ -139,7 +148,10 @@ data "aws_iam_policy_document" "activity_videos" {
     resources = ["${aws_s3_bucket.activity_videos.arn}/*"]
   }
 
-  # Cleaning up interrupted multipart uploads.
+  # Cleaning up interrupted multipart uploads. ListMultipartUploadParts is also
+  # what lets the S3 footprint exporter price them — this bucket is the one
+  # browsers PUT to directly, so an upload dying mid-flight is the realistic
+  # case and its parts are billed until aborted.
   statement {
     effect = "Allow"
     actions = [

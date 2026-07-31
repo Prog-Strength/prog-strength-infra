@@ -42,3 +42,11 @@ scrape_configs:
     static_configs:
       - targets: ["agent:8001"]
     metrics_path: /metrics
+
+  # S3 footprint exporter. Publishes ps_s3_* gauges describing object counts
+  # and stored bytes per bucket. It rescans S3 every 15 minutes on its own
+  # timer, so scraping at the global 15s interval just re-reads cached values.
+  - job_name: s3_exporter
+    static_configs:
+      - targets: ["s3_exporter:9103"]
+    metrics_path: /metrics

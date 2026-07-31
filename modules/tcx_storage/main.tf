@@ -76,19 +76,30 @@ resource "aws_s3_bucket_lifecycle_configuration" "tcx_uploads" {
 
 data "aws_iam_policy_document" "tcx_uploads" {
   # Bucket-level: the backend lists objects to manage uploaded activity files.
+  # ListBucketVersions and ListBucketMultipartUploads are for the S3 footprint
+  # exporter (monitoring/s3_exporter), not the API: this bucket is versioned,
+  # so noncurrent versions are billed storage that a plain ListBucket cannot
+  # see, and incomplete multipart uploads are invisible to both.
   statement {
-    effect    = "Allow"
-    actions   = ["s3:ListBucket"]
+    effect = "Allow"
+    actions = [
+      "s3:ListBucket",
+      "s3:ListBucketVersions",
+      "s3:ListBucketMultipartUploads",
+    ]
     resources = [aws_s3_bucket.tcx_uploads.arn]
   }
 
   # Object-level: read, write, and delete TCX files under any key.
+  # ListMultipartUploadParts is the exporter's — sizing an incomplete upload
+  # means listing its parts, since ListMultipartUploads reports existence only.
   statement {
     effect = "Allow"
     actions = [
       "s3:GetObject",
       "s3:PutObject",
       "s3:DeleteObject",
+      "s3:ListMultipartUploadParts",
     ]
     resources = ["${aws_s3_bucket.tcx_uploads.arn}/*"]
   }
