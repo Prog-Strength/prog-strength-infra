@@ -1,0 +1,23 @@
+# Buckets the S3 footprint exporter scans, and the `purpose` label each one
+# gets on every metric.
+#
+# The purpose values mirror the S3 `Purpose` tag Terraform already puts on
+# each bucket, so PromQL can select by content type
+# (purpose="activity-videos") without hardcoding bucket names in dashboard
+# queries. Bucket names mirror environments/prod.tfvars.
+#
+# This is version-controlled config, not environment: adding a sixth bucket
+# should be a one-line edit reviewed in a PR, not a Secrets Manager change.
+# Keep in sync with prod.tfvars when a bucket is added or renamed.
+
+buckets:
+  - name: prog-strength-tcx-uploads
+    purpose: tcx-uploads
+  - name: prog-strength-avatars
+    purpose: user-avatars
+  - name: prog-strength-activity-photos
+    purpose: activity-photos
+  - name: prog-strength-activity-videos
+    purpose: activity-videos
+  - name: prog-strength-database-backups
+    purpose: database-backups
