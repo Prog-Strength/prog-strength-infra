@@ -65,6 +65,17 @@ module "activity_photo_storage" {
   instance_role_name     = module.compute.instance_role_name
 }
 
+module "activity_video_storage" {
+  source = "./modules/activity_video_storage"
+
+  name_prefix                     = local.name_prefix
+  bucket_name                     = var.activity_video_storage.bucket_name
+  cors_allowed_origins            = var.activity_video_storage.cors_allowed_origins
+  orphan_expiration_days          = var.activity_video_storage.orphan_expiration_days
+  abort_incomplete_multipart_days = var.activity_video_storage.abort_incomplete_multipart_days
+  instance_role_name              = module.compute.instance_role_name
+}
+
 module "ecr" {
   source = "./modules/ecr"
 

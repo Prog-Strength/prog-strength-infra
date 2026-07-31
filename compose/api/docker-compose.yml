@@ -103,6 +103,13 @@ services:
       # environment, so omitting the forward still passes the gate and ships a
       # green deploy whose photo endpoints are dead.
       - PHOTO_BUCKET_NAME=${PHOTO_BUCKET_NAME}
+      # If unset, activity-video storage is disabled and every video endpoint
+      # returns 503 video_storage_unavailable. Same shape as photos above —
+      # and the same trap: the deploy's require_env_keys gate validates .env on
+      # the HOST, not the container, so omitting this line still ships a green
+      # deploy with dead endpoints. deploy/tests/compose-forwards-config.test.sh
+      # now fails CI if a config.env key isn't forwarded here.
+      - VIDEO_BUCKET_NAME=${VIDEO_BUCKET_NAME}
       # The api's S3 archiver builds its client via config.LoadDefaultConfig,
       # which resolves region from AWS_REGION / AWS_DEFAULT_REGION / config
       # file / IMDS. None of those are reachable inside the container: env
