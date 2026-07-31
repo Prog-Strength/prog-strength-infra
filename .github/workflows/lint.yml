@@ -47,3 +47,16 @@ jobs:
         # Terraform bootstrap templatefile and the on-host deploy scripts +
         # their sourced lib and tests. -x follows `source` directives.
         run: shellcheck -x modules/compute/bootstrap.sh deploy/*.sh deploy/lib/*.sh deploy/tests/*.sh
+
+      - name: deploy tests
+        # The deploy/tests/*.sh suites were shellchecked but never executed, so
+        # a real regression in them could land green. They're dependency-free
+        # bash — run them. compose-forwards-config catches a config.env key that
+        # never gets forwarded into the container, which no other gate sees.
+        run: |
+          status=0
+          for t in deploy/tests/*.test.sh; do
+            echo "--- ${t}"
+            bash "$t" || status=1
+          done
+          exit "$status"
