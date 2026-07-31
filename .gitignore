@@ -22,6 +22,12 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
+# Python — only monitoring/s3_exporter/ ships any, but running its tests
+# scatters bytecode and pytest caches that must never be committed.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
 # OS / editor
 .DS_Store
 .vscode/
