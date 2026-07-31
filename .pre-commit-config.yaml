@@ -65,6 +65,18 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      # Mirrors the s3-exporter-tests job in lint.yml. Push-stage because it
+      # is the slower of the two local Python hooks and the exporter changes
+      # rarely; commit-stage would tax every unrelated commit.
+      - id: s3-exporter-tests
+        name: s3 exporter unit tests
+        entry: python3 -m pytest monitoring/s3_exporter/tests -q
+        language: python
+        additional_dependencies: [pytest, pyyaml, boto3, prometheus_client]
+        files: ^monitoring/s3_exporter/.*\.py$
+        pass_filenames: false
+        stages: [pre-push]
+
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.10.0
     hooks:
