@@ -77,15 +77,26 @@ resource "aws_s3_bucket_lifecycle_configuration" "avatars" {
 
 data "aws_iam_policy_document" "avatars" {
   # Bucket-level: the backend lists objects to manage avatar files.
+  # ListBucketVersions and ListBucketMultipartUploads serve the S3 footprint
+  # exporter (monitoring/s3_exporter). This bucket is not versioned today, but
+  # the exporter uses ListObjectVersions uniformly across all five buckets so
+  # that enabling versioning later cannot silently make the dashboard
+  # under-report.
   statement {
-    effect    = "Allow"
-    actions   = ["s3:ListBucket"]
+    effect = "Allow"
+    actions = [
+      "s3:ListBucket",
+      "s3:ListBucketVersions",
+      "s3:ListBucketMultipartUploads",
+    ]
     resources = [aws_s3_bucket.avatars.arn]
   }
 
   # Object-level: GetObject for presigned reads, PutObject for uploads,
   # PutObjectTagging to mark superseded objects orphaned for the lifecycle
   # rule, and DeleteObject as harmless future-proofing.
+  # ListMultipartUploadParts is the exporter's — sizing an incomplete upload
+  # means listing its parts, since ListMultipartUploads reports existence only.
   statement {
     effect = "Allow"
     actions = [
@@ -93,6 +104,7 @@ data "aws_iam_policy_document" "avatars" {
       "s3:PutObject",
       "s3:PutObjectTagging",
       "s3:DeleteObject",
+      "s3:ListMultipartUploadParts",
     ]
     resources = ["${aws_s3_bucket.avatars.arn}/*"]
   }
