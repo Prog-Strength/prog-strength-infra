@@ -58,7 +58,7 @@
       "id": 3,
       "type": "stat",
       "title": "Recovery rows upserted (24h)",
-      "description": "Recovery records actually written in the last 24h. This is the ground truth the dashboard card feeds from — syncs can report OK while writing nothing (the v0.79.x scope bug looked exactly like that from the outside). Yellow at 0: with one connected user a quiet day is possible (late wake, unscored recovery), but a second consecutive zero-day deserves a look at 'Rows by disposition' below.",
+      "description": "Recovery records actually written in the last 24h. This is the ground truth the dashboard card feeds from — syncs can report OK while writing nothing (the v0.79.x scope bug looked exactly like that from the outside). Red at 0: zero rows written must never read as healthy — that soft signal is what let this outage persist. A single quiet day (late wake, unscored recovery) can also read zero, so confirm against 'Rows by disposition' below and Rule A before acting.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 4, "w": 6, "x": 6, "y": 3},
       "targets": [
@@ -82,7 +82,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "yellow", "value": null},
+              {"color": "red", "value": null},
               {"color": "green", "value": 1}
             ]
           }
@@ -464,6 +464,31 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
+          "min": 0,
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Connections by status",
+      "description": "Current WHOOP connections broken down by status (connected / revoked / error). Surfaces a connection flipping to `error` (refresh token died, invalid_grant) or `revoked` — the health the dashboard previously could not show, because the counters above only fire on activity while a dead connection simply goes quiet. A rising `error` line is the leading edge of a \"my WHOOP stopped syncing\" report before the user notices.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 42},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (status) (api_whoop_connections)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
           "min": 0,
           "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
         },
