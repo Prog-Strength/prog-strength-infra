@@ -37,6 +37,22 @@ jobs:
         # Lints the root module and every module under modules/.
         run: tflint --recursive --format compact
 
+  grafana-alert-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate provisioned Grafana alert rules
+        # Grafana validates provisioning files only at STARTUP, and one bad
+        # rule stops ProvisioningServiceImpl outright — taking Grafana, its
+        # dashboards, and all alerting down together. On 2026-07-31 a rule
+        # shipped with __dashboardUid__ but no __panelId__ and did exactly
+        # that. This gate moves that failure from "discovered when monitoring
+        # vanishes" to "red PR check".
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 monitoring/grafana/provisioning/alerting/validate_rules.py
+
   shellcheck:
     runs-on: ubuntu-latest
     steps:

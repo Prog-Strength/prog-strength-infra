@@ -49,6 +49,22 @@ repos:
           - --args=--recursive
           - --args=--config=__GIT_WORKING_DIR__/.tflint.hcl
 
+  - repo: local
+    hooks:
+      # Mirrors the grafana-alert-rules job in lint.yml. Fast and offline —
+      # a bad provisioned rule is fatal to Grafana at startup (it stops the
+      # whole provisioning service), so catching it at commit time is worth
+      # the hook. pass_filenames is false because the script globs the rules
+      # directory itself and checks uid uniqueness ACROSS files.
+      - id: grafana-alert-rules
+        name: validate provisioned Grafana alert rules
+        entry: python3 monitoring/grafana/provisioning/alerting/validate_rules.py
+        language: python
+        additional_dependencies: [pyyaml]
+        files: ^monitoring/grafana/provisioning/alerting/.*\.(ya?ml|py)$
+        pass_filenames: false
+        stages: [pre-commit]
+
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.10.0
     hooks:

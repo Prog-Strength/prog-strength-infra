@@ -83,7 +83,14 @@ groups:
           summary: >-
             Zero window-driven WHOOP syncs completed in the last 36h while at
             least one account is connected — WHOOP ingestion is dead.
+          # Grafana rejects a rule carrying only ONE of this pair — the
+          # provisioner fails the whole file and ProvisioningServiceImpl
+          # stops, which takes Grafana's background services down with it.
+          # Always set both, or neither. Panel 10 plots
+          # api_whoop_syncs_total by kind & result, i.e. exactly the series
+          # this rule evaluates.
           __dashboardUid__: ps-whoop
+          __panelId__: "10"
 
       - uid: whoop-webhook-misroute
         title: WHOOP webhook misrouted — warning
@@ -121,4 +128,11 @@ groups:
             Webhook deliveries for provider {{ .Labels.provider }} were
             misrouted in the last hour — fix the webhook URL in the WHOOP
             Developer Dashboard.
-          __dashboardUid__: ps-whoop
+          # NO dashboard link, deliberately — and it must stay all-or-nothing
+          # (see the note on the rule above). No ps-whoop panel plots
+          # api_webhook_misroute_total, and linking this to a handler-side
+          # panel like "Webhook deliveries by outcome" would be actively
+          # misleading: a misrouted delivery 404s at the router and never
+          # reaches the handler, so it can never appear there. That blind
+          # spot is the exact reason this rule exists. Add a misroute panel
+          # first, then link both annotations to it.
