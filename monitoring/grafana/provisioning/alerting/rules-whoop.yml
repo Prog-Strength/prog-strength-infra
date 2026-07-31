@@ -3,23 +3,29 @@
 #
 # Rule A (dead ingestion) is a cause-agnostic liveness backstop: it fires when
 # zero window-driven WHOOP syncs have completed in 36h while ≥1 account is
-# connected. Two deliberate design choices make this work:
-#   - `or vector(0)` materialises a literal zero when the
-#     api_whoop_syncs_total{kind="window"} series has never existed. Without
-#     it, a never-existed series returns NoData — which `noDataState` would
-#     have to interpret — so the "no successes ever" case (the exact thing we
-#     want to page on) could be silently swallowed. The zero lets the rule
-#     evaluate and cross the `lt 0.5` threshold.
-#   - `and on()` gates the whole expression on there being ≥1 connected
-#     account (api_whoop_connections{status="connected"} > 0). A fresh or
-#     empty environment with no connected accounts has nothing to ingest, so
-#     it must not page. `and on()` drops the left side to empty when no
-#     account is connected, yielding NoData for that case.
+# connected. How the pieces interact:
+#   - `or vector(0)` is what makes the real outage fire, independent of
+#     noDataState. Whenever ≥1 account is connected the expression always
+#     evaluates to a concrete number: 0 if no window syncs happened in 36h,
+#     positive otherwise. So the actual outage — connected account(s) present
+#     but zero webhook-driven kind="window" syncs, INCLUDING the case where
+#     the api_whoop_syncs_total{kind="window"} series never existed at all —
+#     resolves to 0 and crosses the `lt 0.5` threshold. This firing does not
+#     depend on noDataState; the literal zero does the work.
+#   - `and on() (sum(api_whoop_connections{status="connected"}) > 0)` gates
+#     the expression on there being ≥1 connected account. The expression
+#     returns an empty result (→ NoData) ONLY when zero accounts are
+#     connected. Combined with noDataState: Alerting below, that
+#     zero-connections case therefore ALSO alerts — the gate does not suppress
+#     it. At the current single-user scale there is always at least one
+#     connected account, so this is acceptable; a fully-disconnected state
+#     surfaces as an alert, which doubles as a "reconnect me" signal.
 # noDataState: Alerting on Rule A is a DELIBERATE departure from this file's
 #   usual noDataState: OK convention (documented in README.md for error
 #   counters). Rule A is a liveness monitor — it alerts on the ABSENCE of
-#   success, not on an error counter — so NoData (nothing succeeding, and the
-#   gate can't distinguish it) should surface loudly rather than be hidden.
+#   success, not on an error counter. Alerting-on-NoData covers the
+#   zero-connections case above and, with execErrState: Alerting, ensures a
+#   genuinely broken query surfaces loudly rather than silently.
 #
 # Rule B (webhook misroute) is the fast, specific complement: it fires within
 # an hour when any api_webhook_misroute_total increments, naming the offending
