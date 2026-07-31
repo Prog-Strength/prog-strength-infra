@@ -123,3 +123,96 @@ def test_load_buckets_rejects_an_empty_config(tmp_path):
 
     with pytest.raises(ValueError):
         s3_exporter.load_buckets(str(config))
+
+
+class _StopLoop(Exception):
+    """Raised from the patched time.sleep to escape main()'s infinite loop."""
+
+
+def _write_config(tmp_path):
+    config = tmp_path / "buckets.yml"
+    config.write_text("buckets:\n  - name: bkt-a\n    purpose: activity-photos\n")
+    return str(config)
+
+
+def _patch_main_collaborators(monkeypatch, tmp_path, *, port=None, refresh_seconds=None):
+    """Wire main()'s external dependencies to spies and cap the loop at one
+    iteration. Returns a dict that main() fills in as it runs."""
+    calls = {}
+
+    monkeypatch.setenv("S3_EXPORTER_CONFIG", _write_config(tmp_path))
+    if port is not None:
+        monkeypatch.setenv("S3_EXPORTER_PORT", str(port))
+    else:
+        monkeypatch.delenv("S3_EXPORTER_PORT", raising=False)
+    if refresh_seconds is not None:
+        monkeypatch.setenv("S3_EXPORTER_REFRESH_SECONDS", str(refresh_seconds))
+    else:
+        monkeypatch.delenv("S3_EXPORTER_REFRESH_SECONDS", raising=False)
+
+    monkeypatch.setattr(s3_exporter.boto3, "client", lambda service: calls.setdefault("client", "fake-s3-client"))
+
+    real_build_metrics = s3_exporter.build_metrics
+
+    def spy_build_metrics():
+        registry, metrics = real_build_metrics()
+        calls["registry"] = registry
+        calls["metrics"] = metrics
+        return registry, metrics
+
+    monkeypatch.setattr(s3_exporter, "build_metrics", spy_build_metrics)
+
+    def fake_start_http_server(port, registry=None):
+        calls["server_port"] = port
+        calls["server_registry"] = registry
+
+    monkeypatch.setattr(s3_exporter, "start_http_server", fake_start_http_server)
+
+    def fake_refresh(metrics, client, buckets, now):
+        calls["refresh_metrics"] = metrics
+        calls["refresh_client"] = client
+        calls["refresh_buckets"] = buckets
+        calls["refresh_now"] = now
+
+    monkeypatch.setattr(s3_exporter, "refresh", fake_refresh)
+
+    def fake_sleep(seconds):
+        calls["sleep_seconds"] = seconds
+        raise _StopLoop()
+
+    monkeypatch.setattr(s3_exporter.time, "sleep", fake_sleep)
+
+    return calls
+
+
+def test_main_wires_env_config_registry_and_calls_refresh_before_sleeping(monkeypatch, tmp_path):
+    calls = _patch_main_collaborators(monkeypatch, tmp_path)
+
+    with pytest.raises(_StopLoop):
+        s3_exporter.main()
+
+    # Defaults, since S3_EXPORTER_PORT / S3_EXPORTER_REFRESH_SECONDS are unset.
+    assert calls["server_port"] == s3_exporter.DEFAULT_PORT
+    assert calls["sleep_seconds"] == s3_exporter.DEFAULT_REFRESH_SECONDS
+
+    # The registry handed to start_http_server must be the one build_metrics()
+    # actually built -- not a second, disconnected registry -- or Prometheus
+    # would scrape an empty set of series.
+    assert calls["server_registry"] is calls["registry"]
+    assert calls["refresh_metrics"] is calls["metrics"]
+    assert calls["refresh_client"] == "fake-s3-client"
+    assert calls["refresh_buckets"] == [("bkt-a", "activity-photos")]
+
+    # refresh() only ran because it's captured in `calls`; the loop reaches
+    # time.sleep() (and raises _StopLoop) strictly after refresh() returns.
+    assert "refresh_buckets" in calls
+
+
+def test_main_honours_nondefault_port_and_refresh_interval(monkeypatch, tmp_path):
+    calls = _patch_main_collaborators(monkeypatch, tmp_path, port=9999, refresh_seconds=42)
+
+    with pytest.raises(_StopLoop):
+        s3_exporter.main()
+
+    assert calls["server_port"] == 9999
+    assert calls["sleep_seconds"] == 42

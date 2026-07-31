@@ -82,7 +82,7 @@ def build_metrics() -> tuple[CollectorRegistry, dict]:
         ),
         "largest": Gauge(
             "ps_s3_bucket_largest_object_bytes",
-            "Size of the largest single object in the bucket.",
+            "Size of the largest object in the bucket, including noncurrent versions still billed as storage.",
             _BUCKET_LABELS,
             registry=registry,
         ),
@@ -184,6 +184,15 @@ def main() -> None:
     log.info("serving on :%d, scanning %d buckets every %ds", port, len(buckets), interval)
 
     while True:
+        # refresh() contains per-bucket AWS/client errors internally (see its
+        # docstring) and always returns normally. Anything that escapes it
+        # anyway -- a bug in the gauge-writing code, not an AWS error -- is
+        # allowed to propagate and kill this process on purpose. The compose
+        # service's `restart: unless-stopped` is what brings it back. A
+        # frozen exporter that keeps serving stale-but-plausible gauges is
+        # worse than an absent one: the staleness alert can only fire on a
+        # missing scrape or an old ps_s3_last_scan_timestamp_seconds, and a
+        # wedged-but-running process gives it neither.
         refresh(metrics, client, buckets, now=time.time())
         time.sleep(interval)
 
