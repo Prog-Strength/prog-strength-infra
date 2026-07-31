@@ -37,6 +37,11 @@ output "avatar_bucket_name" {
   value       = module.avatar_storage.bucket_name
 }
 
+output "photo_bucket_name" {
+  description = "Set as PHOTO_BUCKET_NAME in the backend host's .env"
+  value       = module.activity_photo_storage.bucket_name
+}
+
 output "api_instance_profile_name" {
   description = "Instance profile attached to the backend EC2 instance. Listed for visibility; not needed at deploy time."
   value       = module.compute.instance_profile_name

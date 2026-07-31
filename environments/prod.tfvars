@@ -54,6 +54,18 @@ avatar_storage = {
   orphan_expiration_days = 7
 }
 
+# --- Activity Photo Storage Configurations (activity photo uploads → S3) ---
+
+activity_photo_storage = {
+  # Globally-unique bucket name; the backend references this same value via
+  # the PHOTO_BUCKET_NAME env var. Not versioned (latest-wins via distinct
+  # UUID keys). The lifecycle rule expires ONLY objects the API tags
+  # photo-status=orphaned after this many days — current photos are
+  # untagged and never reaped.
+  bucket_name            = "prog-strength-activity-photos"
+  orphan_expiration_days = 7
+}
+
 # --- Compute Configurations (API & Database) ---
 
 compute = {
