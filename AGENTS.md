@@ -78,7 +78,7 @@ for prod live in `environments/prod.tfvars`.
 | Module                   | What it provisions                                                            |
 | ------------------------ | ----------------------------------------------------------------------------- |
 | `network`                | VPC, public subnet, IGW, route table.                                         |
-| `security_group`         | The instance's security group (80 / 443; no inbound SSH).                     |
+| `security_group`         | The instance's security group (80 / 443, plus 22 for direct operator SSH).    |
 | `compute`                | The EC2 host, its EIP, the instance IAM role/profile, and `bootstrap.sh`.     |
 | `backup`                 | Litestream S3 replica bucket (SQLite WAL + snapshots) and its scoped policy.  |
 | `tcx_storage`            | S3 bucket for Garmin TCX activity-file uploads.                               |

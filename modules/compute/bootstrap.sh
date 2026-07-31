@@ -103,19 +103,20 @@ docker network create prog-strength 2>/dev/null || true
 # --- SSM agent (deploy transport + break-glass shell) -----------------------
 #
 # Deploys run through SSM Run Command and operators break-glass via SSM
-# Session Manager — there is NO inbound SSH. Recent Ubuntu AMIs ship
-# amazon-ssm-agent preinstalled via snap; enable + start it explicitly so a
-# freshly-bootstrapped host registers as a managed node with no manual step.
-# The instance role (AmazonSSMManagedInstanceCore, attached in
-# modules/compute/iam.tf) is what authorizes registration.
+# Session Manager. Recent Ubuntu AMIs ship amazon-ssm-agent preinstalled via
+# snap; enable + start it explicitly so a freshly-bootstrapped host registers
+# as a managed node with no manual step. The instance role
+# (AmazonSSMManagedInstanceCore, attached in modules/compute/iam.tf) is what
+# authorizes registration.
 #
 # The first two branches cover the snap and systemd packagings; the third
 # installs the agent outright for an image that doesn't preinstall it. This
-# deliberately does NOT end in `|| true`: with port 22 closed, an unregistered
-# host has no way in at all, and a bootstrap that "succeeds" while stranding
-# the instance is worse than one that fails visibly in
-# /var/log/cloud-init-output.log. Failing here costs only the cosmetic
-# fastfetch block below.
+# deliberately does NOT end in `|| true`: an unregistered node breaks every
+# deploy workflow, and a bootstrap that "succeeds" while leaving the host
+# undeployable is worse than one that fails visibly in
+# /var/log/cloud-init-output.log. Inbound SSH is open, so this is no longer
+# the only way back into a host — but it is still the only way CI reaches
+# one. Failing here costs only the cosmetic fastfetch block below.
 snap start amazon-ssm-agent 2>/dev/null \
   || systemctl enable --now amazon-ssm-agent 2>/dev/null \
   || snap install amazon-ssm-agent --classic

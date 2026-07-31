@@ -116,16 +116,35 @@ compute = {
   # without absorbing every build/cache spike into an alert.
   root_volume_size = 20
   security_group = {
-    # Inbound SSH (22) intentionally removed: deploys run via SSM Run Command
-    # and operators break-glass via SSM Session Manager, both of which dial
-    # OUT to AWS over 443 — no inbound port needed. See
-    # prog-strength-docs/sows/ssm-deploys-retire-ssh.md.
+    # Note: the module only reads cidr_blocks[0] of each rule, and keys the
+    # rules by description — so a second source CIDR means a second entry
+    # with its own unique description, not another element here.
     ingress_rules = [
       {
         description = "HTTP (Caddy ACME challenge + redirect)"
         protocol    = "tcp"
         from_port   = 80
         to_port     = 80
+        cidr_blocks = ["0.0.0.0/0"]
+      },
+      {
+        # Inbound SSH, reopened by operator decision. This reverses the
+        # posture set by prog-strength-docs/sows/ssm-deploys-retire-ssh.md,
+        # which closed port 22 because both deploy paths dial OUT to AWS
+        # over 443: deploys still run via SSM Run Command and break-glass
+        # via SSM Session Manager, so nothing in CI depends on this rule.
+        # It exists purely for direct operator SSH.
+        #
+        # Scoped to 0.0.0.0/0, so sshd is exposed to the internet-wide
+        # scanners that sweep every public IPv4 continuously. What stands
+        # between them and the host is key-only auth — Ubuntu's cloud image
+        # ships PasswordAuthentication no, and the only authorized key is
+        # the one cloud-init installs from the `ssh_key_name` key pair. If
+        # that ever changes, this rule becomes the exposure.
+        description = "SSH (direct operator access)"
+        protocol    = "tcp"
+        from_port   = 22
+        to_port     = 22
         cidr_blocks = ["0.0.0.0/0"]
       },
       {

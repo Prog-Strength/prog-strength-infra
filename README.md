@@ -26,9 +26,10 @@ static keys:
   `replace-instance.yml`.
 
 The Caddy deploy workflow (`deploy-caddy.yml`) deploys via SSM Run Command
-using the same OIDC role — no SSH, no inbound port 22, and no `EC2_HOST` /
-`EC2_SSH_KEY` secrets. It targets the host by its `Name` tag, so it also
-survives an instance replacement.
+using the same OIDC role — no SSH and no `EC2_HOST` / `EC2_SSH_KEY` secrets.
+It targets the host by its `Name` tag, so it also survives an instance
+replacement. (Port 22 is open for direct operator SSH, but no workflow
+depends on it.)
 
 ## Local development
 
@@ -76,9 +77,9 @@ operator-facing overrides for prod live in `environments/prod.tfvars`.
 | `instance_type`                  | `t4g.small`                       | Graviton; AMI must match `arm64`.                         |
 | `ami_name_pattern`               | Ubuntu 24.04 noble arm64 (gp3)    | Filter passed to `aws_ami` data source. Prod overrides this to Ubuntu 26.04 resolute — see `environments/prod.tfvars`. |
 | `ami_owner`                      | `099720109477` (Canonical)        |                                                           |
-| `ssh_key_name`                   | `prog-strength-backend-prod-keys` | Key pair must already exist in EC2. Unused now that port 22 is closed — deploys + break-glass go through SSM. |
+| `ssh_key_name`                   | `prog-strength-backend-prod-keys` | Key pair must already exist in EC2. cloud-init installs its public key as the host's only authorized key, which is what makes the port 22 rule safe to expose. |
 | `root_volume_size`               | `8`                               | GiB; gp3 encrypted root.                                  |
-| `security_group.ingress_rules`   | `[]`                              | Set in `environments/prod.tfvars`. 80/443 by default (no inbound SSH — deploys + break-glass go through SSM). |
+| `security_group.ingress_rules`   | `[]`                              | Set in `environments/prod.tfvars`: 80/443 plus SSH on 22 from `0.0.0.0/0`. Deploys and break-glass still go through SSM; port 22 is for direct operator SSH only. |
 | `bootstrap.infra_repo_url`       | This repo's HTTPS clone URL        | Cloned by `bootstrap.sh` on first boot for the host's compose manifests. |
 
 The instance also gets a single IAM instance profile (produced by the
