@@ -82,7 +82,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "yellow", "value": null},
+              {"color": "red", "value": null},
               {"color": "green", "value": 1}
             ]
           }
@@ -464,6 +464,31 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
+          "min": 0,
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Connections by status",
+      "description": "Current WHOOP connections broken down by status (connected / revoked / error). Surfaces a connection flipping to `error` (refresh token died, invalid_grant) or `revoked` — the health the dashboard previously could not show, because the counters above only fire on activity while a dead connection simply goes quiet. A rising `error` line is the leading edge of a \"my WHOOP stopped syncing\" report before the user notices.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 42},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (status) (api_whoop_connections)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
           "min": 0,
           "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
         },
