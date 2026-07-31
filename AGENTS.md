@@ -93,8 +93,17 @@ attach a scoped policy to the **single** instance role the `compute`
 module creates, so the host authenticates to every AWS service it touches
 without keys. Non-Terraform directories: `compose/` (per-service
 docker-compose manifests), `caddy/` (the `Caddyfile`), `monitoring/`
-(Prometheus/Grafana config). `imports.tf` holds resources adopted into
-state rather than created (e.g. the pre-existing OIDC provider).
+(Prometheus/Grafana config).
+
+`monitoring/s3_exporter/` is the one piece of application code this repo
+ships: a small Python Prometheus exporter that lists the S3 buckets and
+publishes footprint gauges for the `S3 Storage` dashboard. It runs as a
+compose service on the backend host, is built there rather than pulled from
+ECR (so `deploy/api.sh` passes `--build`), and reads AWS credentials from the
+instance profile. Its unit tests are a PR gate (`lint.yml`).
+
+`imports.tf` holds resources adopted into state rather than created (e.g.
+the pre-existing OIDC provider).
 
 ## CI/CD
 
