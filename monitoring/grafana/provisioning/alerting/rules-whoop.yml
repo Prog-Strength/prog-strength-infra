@@ -1,0 +1,118 @@
+# WHOOP integration diagnostics alerts. Two complementary monitors on the
+# ps-whoop dashboard's ingestion and webhook-routing health.
+#
+# Rule A (dead ingestion) is a cause-agnostic liveness backstop: it fires when
+# zero window-driven WHOOP syncs have completed in 36h while ≥1 account is
+# connected. Two deliberate design choices make this work:
+#   - `or vector(0)` materialises a literal zero when the
+#     api_whoop_syncs_total{kind="window"} series has never existed. Without
+#     it, a never-existed series returns NoData — which `noDataState` would
+#     have to interpret — so the "no successes ever" case (the exact thing we
+#     want to page on) could be silently swallowed. The zero lets the rule
+#     evaluate and cross the `lt 0.5` threshold.
+#   - `and on()` gates the whole expression on there being ≥1 connected
+#     account (api_whoop_connections{status="connected"} > 0). A fresh or
+#     empty environment with no connected accounts has nothing to ingest, so
+#     it must not page. `and on()` drops the left side to empty when no
+#     account is connected, yielding NoData for that case.
+# noDataState: Alerting on Rule A is a DELIBERATE departure from this file's
+#   usual noDataState: OK convention (documented in README.md for error
+#   counters). Rule A is a liveness monitor — it alerts on the ABSENCE of
+#   success, not on an error counter — so NoData (nothing succeeding, and the
+#   gate can't distinguish it) should surface loudly rather than be hidden.
+#
+# Rule B (webhook misroute) is the fast, specific complement: it fires within
+# an hour when any api_webhook_misroute_total increments, naming the offending
+# provider so the operator can fix the webhook URL in the WHOOP Developer
+# Dashboard. It is a plain error counter, so it keeps noDataState: OK.
+#
+# Thresholds sit at 0.5 (rather than 1) because increase() extrapolates and can
+# report slightly under an integer; 0.5 makes "1 event" cross reliably.
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: whoop
+    folder: Prog Strength Alerts
+    interval: 1m
+    rules:
+      - uid: whoop-dead-ingestion
+        title: WHOOP ingestion dead — critical
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 129600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: |-
+                (
+                  sum(increase(api_whoop_syncs_total{kind="window",result="ok"}[36h])) or vector(0)
+                )
+                and on()
+                (sum(api_whoop_connections{status="connected"}) > 0)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [0.5]
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 0s
+        labels:
+          severity: critical
+          service: whoop
+        annotations:
+          summary: >-
+            Zero window-driven WHOOP syncs completed in the last 36h while at
+            least one account is connected — WHOOP ingestion is dead.
+          __dashboardUid__: ps-whoop
+
+      - uid: whoop-webhook-misroute
+        title: WHOOP webhook misrouted — warning
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum by (provider) (increase(api_webhook_misroute_total[1h]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        labels:
+          severity: warning
+          service: whoop
+        annotations:
+          summary: >-
+            Webhook deliveries for provider {{ .Labels.provider }} were
+            misrouted in the last hour — fix the webhook URL in the WHOOP
+            Developer Dashboard.
+          __dashboardUid__: ps-whoop
