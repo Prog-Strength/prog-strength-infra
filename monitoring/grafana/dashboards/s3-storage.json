@@ -242,7 +242,7 @@
       "id": 7,
       "type": "stat",
       "title": "Growth (7d)",
-      "description": "Bytes added across all buckets in the last 7 days. Smooths out a single large upload, so it answers 'is the trend real?' where the 24h tile answers 'did something just happen?'. Prometheus retains 15 days of data, so this tile is empty for the first week after the exporter is deployed.",
+      "description": "Bytes added across all buckets in the last 7 days. Smooths out a single large upload, so it answers 'is the trend real?' where the 24h tile answers 'did something just happen?'. On a freshly deployed exporter this tile reports only the change observed so far, so it understates real 7-day growth until the series is a week old — understating is the safe direction for a threshold.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -485,7 +485,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (bucket) (ps_s3_bucket_bytes) / sum by (bucket) (ps_s3_bucket_objects)",
+          "expr": "sum by (bucket) (ps_s3_bucket_bytes) / clamp_min(sum by (bucket) (ps_s3_bucket_objects), 1)",
           "refId": "D",
           "instant": true,
           "format": "table"
@@ -954,7 +954,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(ps_s3_bucket_bytes{purpose=\"activity-photos\"}) / sum(ps_s3_bucket_objects{purpose=\"activity-photos\"})",
+          "expr": "sum(ps_s3_bucket_bytes{purpose=\"activity-photos\"}) / clamp_min(sum(ps_s3_bucket_objects{purpose=\"activity-photos\"}), 1)",
           "refId": "A",
           "instant": true
         }
@@ -1017,7 +1017,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(ps_s3_bucket_bytes{purpose=\"activity-videos\"}) / sum(ps_s3_bucket_objects{purpose=\"activity-videos\"})",
+          "expr": "sum(ps_s3_bucket_bytes{purpose=\"activity-videos\"}) / clamp_min(sum(ps_s3_bucket_objects{purpose=\"activity-videos\"}), 1)",
           "refId": "A",
           "instant": true
         }
@@ -1691,7 +1691,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(ps_s3_bucket_bytes{version_state=\"noncurrent\"}) / sum(ps_s3_bucket_bytes)",
+          "expr": "sum(ps_s3_bucket_bytes{version_state=\"noncurrent\"}) / clamp_min(sum(ps_s3_bucket_bytes), 1)",
           "refId": "A",
           "instant": true
         }
@@ -2136,7 +2136,7 @@
       "id": 47,
       "type": "stat",
       "title": "Time since last scan",
-      "description": "Seconds since the last scan in which every bucket succeeded. The exporter rescans every 15 minutes, so this should sawtooth between 0 and ~900. Warning at 30 minutes (two missed cycles), critical at 1 hour. This tile is the reason the dashboard can be trusted — it pages Slack, because a silently dead exporter is exactly how the WHOOP webhook stayed broken for months.",
+      "description": "Seconds since the last scan in which every bucket succeeded. The exporter rescans every 15 minutes, so this should sawtooth between 0 and ~900. Warning at 30 minutes (two missed cycles), critical at 1 hour. This tile is the reason the dashboard can be trusted — it pages Slack, because a silently dead exporter is exactly how the WHOOP webhook stayed broken for months. Capped at 7 days (604800s): seeing the cap means the exporter has never completed a full successful scan (typically a missing IAM permission on one bucket), not merely that it stopped.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -2153,7 +2153,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "time() - ps_s3_last_scan_timestamp_seconds",
+          "expr": "clamp_max(time() - ps_s3_last_scan_timestamp_seconds, 604800)",
           "refId": "A",
           "instant": true
         }
