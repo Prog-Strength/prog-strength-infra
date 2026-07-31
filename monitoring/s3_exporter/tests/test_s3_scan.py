@@ -22,7 +22,14 @@ class FakePaginator:
 
 
 class FakeS3:
-    """Minimal stand-in for a boto3 S3 client."""
+    """Minimal stand-in for a boto3 S3 client.
+
+    Retains the paginator it hands out for each operation (keyed by
+    operation name, last one wins) so tests can assert on the kwargs a
+    paginator's `.paginate()` was actually called with -- not just the
+    aggregated result, which would pass even if scan_bucket called the
+    wrong operation with the wrong arguments.
+    """
 
     def __init__(self, versions=None, uploads=None, parts=None):
         self._pages = {
@@ -30,9 +37,12 @@ class FakeS3:
             "list_multipart_uploads": uploads if uploads is not None else [{}],
             "list_parts": parts if parts is not None else [{}],
         }
+        self.paginators = {}
 
     def get_paginator(self, operation_name):
-        return FakePaginator(self._pages[operation_name])
+        paginator = FakePaginator(self._pages[operation_name])
+        self.paginators[operation_name] = paginator
+        return paginator
 
 
 def _at(epoch):
@@ -120,8 +130,47 @@ def test_missing_size_keys_are_treated_as_zero():
 
 
 def test_scan_passes_bucket_through_to_paginators():
-    client = FakeS3()
+    # A multipart upload is included so there is a list_parts call to
+    # inspect too -- that call is the one most at risk of a Key/UploadId
+    # mixup, since both are plain strings passed positionally in spirit.
+    client = FakeS3(
+        uploads=[{
+            "Uploads": [
+                {"Key": "vid.mp4", "UploadId": "abc123", "Initiated": _at(0)},
+            ],
+        }],
+    )
+
     scan = s3_scan.scan_bucket(client, "prog-strength-avatars", "user-avatars", now=0)
 
     assert scan.bucket == "prog-strength-avatars"
     assert scan.purpose == "user-avatars"
+
+    assert client.paginators["list_object_versions"].kwargs == {
+        "Bucket": "prog-strength-avatars",
+    }
+    assert client.paginators["list_multipart_uploads"].kwargs == {
+        "Bucket": "prog-strength-avatars",
+    }
+    assert client.paginators["list_parts"].kwargs == {
+        "Bucket": "prog-strength-avatars",
+        "Key": "vid.mp4",
+        "UploadId": "abc123",
+    }
+
+
+def test_largest_object_spans_noncurrent_versions():
+    # largest_object_bytes exists to answer "what could be costing money",
+    # not "what is currently live" -- a noncurrent version is still billed
+    # storage until its 30-day expiration, so it must be able to win here
+    # even though a smaller object is the one actually reachable.
+    client = FakeS3(versions=[{
+        "Versions": [
+            {"Key": "a", "Size": 10, "IsLatest": True},
+            {"Key": "a", "Size": 5000, "IsLatest": False},
+        ],
+    }])
+
+    scan = s3_scan.scan_bucket(client, "bkt", "activity-videos", now=0)
+
+    assert scan.largest_object_bytes == 5000

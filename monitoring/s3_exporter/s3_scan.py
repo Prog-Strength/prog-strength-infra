@@ -23,10 +23,17 @@ from dataclasses import dataclass
 class BucketScan:
     """Everything one pass over one bucket produces.
 
-    Sizes are bytes. `multipart_*` covers uploads that were started and never
-    completed — S3 bills for their parts, no lifecycle rule in this repo reaps
-    them, and neither the object listing nor CloudWatch's storage metrics show
-    them. The video bucket is written by browser-direct presigned PUT, so an
+    Sizes are bytes. `largest_object_bytes` spans BOTH current and
+    noncurrent versions, not just what is currently live: a noncurrent
+    version is still billed storage for up to 30 days after being
+    superseded, and this field exists to answer "what could be costing
+    money" rather than "what is reachable" -- so a huge noncurrent version
+    must be able to win here even while a smaller object is the live one.
+
+    `multipart_*` covers uploads that were started and never completed — S3
+    bills for their parts, no lifecycle rule in this repo reaps them, and
+    neither the object listing nor CloudWatch's storage metrics show them.
+    The video bucket is written by browser-direct presigned PUT, so an
     upload dying mid-flight is the realistic case.
     """
 
