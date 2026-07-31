@@ -13,7 +13,7 @@ and which moves are dangerous.
 The Terraform for the Prog Strength **application** stack: one EC2 host
 that runs the entire backend, plus the AWS resources around it. There is
 no Kubernetes, no autoscaling group, no load balancer, no RDS. The host is
-a single `t4g.small` (Graviton/arm64) Ubuntu instance behind an Elastic IP,
+a single `t4g.medium` (Graviton/arm64) Ubuntu instance behind an Elastic IP,
 in a dedicated VPC with one public subnet. State lives in S3
 (`prog-strength-terraform-backend`, us-east-2) with native S3 lockfile
 locking.

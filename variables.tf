@@ -82,6 +82,25 @@ variable "activity_photo_storage" {
   }
 }
 
+variable "activity_video_storage" {
+  description = "Activity video uploads S3 bucket config. Unlike photos, the browser PUTs to this bucket DIRECTLY via presigned URL (a multi-hundred-MB upload can't transit the API host), so it carries a CORS policy and a multipart-abort lifecycle rule that the photo bucket does not need."
+  type = object({
+    bucket_name                     = string
+    cors_allowed_origins            = list(string)
+    orphan_expiration_days          = number
+    abort_incomplete_multipart_days = number
+  })
+  default = {
+    bucket_name = "prog-strength-activity-videos"
+    cors_allowed_origins = [
+      "https://progstrength.fitness",
+      "https://prog-strength-web-*-jimmy-wallaces-projects.vercel.app",
+    ]
+    orphan_expiration_days          = 7
+    abort_incomplete_multipart_days = 3
+  }
+}
+
 variable "compute" {
   description = "EC2 instance config and the security group rules attached to it."
   type = object({

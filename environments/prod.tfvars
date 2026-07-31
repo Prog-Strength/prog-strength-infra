@@ -66,11 +66,45 @@ activity_photo_storage = {
   orphan_expiration_days = 7
 }
 
+activity_video_storage = {
+  # Globally-unique bucket name; the backend references this same value via the
+  # VIDEO_BUCKET_NAME env var. Separate from the photo bucket so CORS,
+  # lifecycle, and cost are addressable independently.
+  bucket_name = "prog-strength-activity-videos"
+  # The browser PUTs video bytes straight here, so S3 answers the CORS
+  # preflight itself. Mirrors the API's own cors.allowed_origins — production
+  # plus the Vercel preview wildcard. A missing origin here surfaces as an
+  # opaque browser CORS failure while curl against the same URL succeeds.
+  cors_allowed_origins = [
+    "https://progstrength.fitness",
+    "https://prog-strength-web-*-jimmy-wallaces-projects.vercel.app",
+  ]
+  # Expires ONLY objects the API tags video-status=orphaned: abandoned
+  # reservations, oversize rejects, and deleted videos. Current videos are
+  # untagged and never reaped.
+  orphan_expiration_days = 7
+  # Interrupted multipart uploads leave billable parts invisible to a normal
+  # listing; abort them after this many days.
+  abort_incomplete_multipart_days = 3
+}
+
 # --- Compute Configurations (API & Database) ---
 
 compute = {
-  instance_type    = "t4g.small" # This is a primary cost factor, right-size carefully
-  ami_name_pattern = "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*"
+  # This is a primary cost factor, right-size carefully. Bumped small -> medium
+  # (2 GB -> 4 GB) when the API started serving activity photos and video: the
+  # host holds request/response buffers for media alongside the API, MCP, agent,
+  # Caddy, Prometheus and Grafana, and 2 GB left no room for that. vCPU count is
+  # unchanged (2); medium also doubles the CPU-credit accrual (24/hr vs 12/hr),
+  # which covers the encode/transfer bursts media traffic arrives in.
+  instance_type = "t4g.medium"
+  # Ubuntu 26.04 LTS (Resolute Raccoon). Moved off 24.04 noble during the
+  # instance resize, since that already required a deliberate host
+  # replacement — see the replacement checklist in CONTRIBUTING.md. The
+  # trailing `*` plus `most_recent = true` tracks the newest 26.04 build,
+  # but `lifecycle.ignore_changes = [ami]` means a new publish never
+  # recycles the live host on its own.
+  ami_name_pattern = "ubuntu/images/hvm-ssd-gp3/ubuntu-resolute-26.04-arm64-server-*"
   ami_owner        = "099720109477"
   ssh_key_name     = "prog-strength-backend-prod-keys"
   # Disk usage at steady state is roughly:

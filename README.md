@@ -74,7 +74,7 @@ operator-facing overrides for prod live in `environments/prod.tfvars`.
 | Field                            | Default                           | Notes                                                     |
 | -------------------------------- | --------------------------------- | --------------------------------------------------------- |
 | `instance_type`                  | `t4g.small`                       | Graviton; AMI must match `arm64`.                         |
-| `ami_name_pattern`               | Ubuntu 24.04 noble arm64 (gp3)    | Filter passed to `aws_ami` data source.                   |
+| `ami_name_pattern`               | Ubuntu 24.04 noble arm64 (gp3)    | Filter passed to `aws_ami` data source. Prod overrides this to Ubuntu 26.04 resolute — see `environments/prod.tfvars`. |
 | `ami_owner`                      | `099720109477` (Canonical)        |                                                           |
 | `ssh_key_name`                   | `prog-strength-backend-prod-keys` | Key pair must already exist in EC2. Unused now that port 22 is closed — deploys + break-glass go through SSM. |
 | `root_volume_size`               | `8`                               | GiB; gp3 encrypted root.                                  |
