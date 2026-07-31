@@ -1,0 +1,188 @@
+# S3 storage footprint alerts. Mirrors the ps-s3-storage dashboard, whose
+# "Total footprint over time" panel (id 8) draws reference lines at the same
+# 5 GB / 20 GB thresholds these rules evaluate.
+#
+# Thresholds are growth tripwires, not cost limits: 20 GB of S3 Standard costs
+# well under a dollar a month. Prog Strength is single-user and pre-launch, so
+# a footprint crossing these means the shape of storage changed — an upload
+# path misbehaving, a reaper not reaping — long before it means a bill.
+#
+# for: 30m on the size rules — the exporter rescans every 15 minutes, so a
+#   30-minute window needs two consecutive scans to agree before paging.
+# noDataState: OK on the size rules — the series does not exist until the
+#   exporter's first successful scan, and absence is covered by
+#   s3-exporter-stale below rather than by every rule separately.
+# execErrState: Alerting throughout — a broken query (metric renamed, exporter
+#   removed) should surface loudly, per this repo's fail-loud philosophy.
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: s3-storage
+    folder: Prog Strength Alerts
+    interval: 5m
+    rules:
+      - uid: s3-footprint-warning
+        title: S3 footprint above warning threshold
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum(ps_s3_bucket_bytes)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5000000000]
+        noDataState: OK
+        execErrState: Alerting
+        for: 30m
+        labels:
+          severity: warning
+          service: s3-storage
+        annotations:
+          summary: >-
+            Total S3 storage across all Prog Strength buckets is above 5 GB.
+            Check which bucket grew on the By bucket section of the dashboard.
+          __dashboardUid__: ps-s3-storage
+          __panelId__: "8"
+
+      - uid: s3-footprint-critical
+        title: S3 footprint above critical threshold
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum(ps_s3_bucket_bytes)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [20000000000]
+        noDataState: OK
+        execErrState: Alerting
+        for: 30m
+        labels:
+          severity: critical
+          service: s3-storage
+        annotations:
+          summary: >-
+            Total S3 storage across all Prog Strength buckets is above 20 GB,
+            far more than a single-user deployment should hold. Investigate
+            before the next billing period.
+          __dashboardUid__: ps-s3-storage
+          __panelId__: "8"
+
+      - uid: s3-exporter-stale
+        title: S3 footprint exporter has stopped reporting
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: time() - ps_s3_last_scan_timestamp_seconds
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [3600]
+        # noDataState: Alerting is deliberate and differs from every other rule
+        # in this directory. For a liveness monitor the ABSENCE of the series
+        # IS the failure: a dead exporter serves no metrics, and a dashboard
+        # showing flat green lines from a dead exporter is worse than no
+        # dashboard. The WHOOP webhook sat broken from ship until 2026-07-31
+        # precisely because nothing alerted on silence.
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 15m
+        labels:
+          severity: critical
+          service: s3-storage
+        annotations:
+          summary: >-
+            No successful S3 scan in over an hour. The S3 Storage dashboard is
+            showing stale numbers. Check the s3_exporter container on the
+            backend host.
+          __dashboardUid__: ps-s3-storage
+          __panelId__: "47"
+
+      - uid: s3-abandoned-multipart
+        title: Abandoned S3 multipart uploads
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum(ps_s3_multipart_uploads)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: Alerting
+        # 24h so a genuinely in-flight video upload never pages. Anything still
+        # incomplete a day later was abandoned, and its parts are billed until
+        # something aborts them.
+        for: 24h
+        labels:
+          severity: warning
+          service: s3-storage
+        annotations:
+          summary: >-
+            An S3 multipart upload has been incomplete for over 24 hours. Its
+            parts are billed as storage and no lifecycle rule reaps them.
+            Most likely a browser-direct activity video upload that failed.
+          __dashboardUid__: ps-s3-storage
+          __panelId__: "41"
