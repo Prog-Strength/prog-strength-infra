@@ -94,6 +94,15 @@ services:
       # container restart — DB rows survive, the original bytes do not.
       # The avatar store also needs AWS_REGION forwarded (see below).
       - AVATAR_BUCKET_NAME=${AVATAR_BUCKET_NAME}
+      # If unset, the API disables activity-photo storage outright and every
+      # photo endpoint returns 503 photo_storage_unavailable (server.go logs
+      # "photo storage disabled"). Unlike TCX/avatars there is no in-memory
+      # fallback — the feature is simply off. Needs AWS_REGION forwarded too
+      # (see below). This line is load-bearing and easy to miss: the deploy's
+      # require_env_keys gate validates .env on the HOST, not the container's
+      # environment, so omitting the forward still passes the gate and ships a
+      # green deploy whose photo endpoints are dead.
+      - PHOTO_BUCKET_NAME=${PHOTO_BUCKET_NAME}
       # The api's S3 archiver builds its client via config.LoadDefaultConfig,
       # which resolves region from AWS_REGION / AWS_DEFAULT_REGION / config
       # file / IMDS. None of those are reachable inside the container: env
