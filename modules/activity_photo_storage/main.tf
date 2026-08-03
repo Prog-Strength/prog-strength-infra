@@ -41,8 +41,62 @@ resource "aws_s3_bucket_public_access_block" "activity_photos" {
   restrict_public_buckets = true
 }
 
+# --- CORS: required for browser-direct upload ------------------------------
+#
+# The client PUTs the photo straight to S3 from the web app's origin, so S3
+# itself answers the preflight — the API is not in that request path at all.
+# Without this every upload fails in the browser with an opaque CORS error
+# while curl against the same presigned URL succeeds, which is a confusing
+# enough failure to be worth naming here.
+#
+# This mirrors activity_video_storage, which needed it first. Photos did not
+# until the upload moved off the API host; see
+# prog-strength-docs/sows/photo-upload-direct-to-s3.md.
+#
+# ExposeHeaders includes ETag so the client can confirm what landed.
+# allowed_origins carries the production origin plus the Vercel preview
+# wildcard, mirroring the API's own cors.allowed_origins.
+resource "aws_s3_bucket_cors_configuration" "activity_photos" {
+  bucket = aws_s3_bucket.activity_photos.id
+
+  cors_rule {
+    allowed_methods = ["PUT", "GET", "HEAD"]
+    allowed_origins = var.cors_allowed_origins
+    allowed_headers = ["*"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3000
+  }
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "activity_photos" {
   bucket = aws_s3_bucket.activity_photos.id
+
+  # Backstop for staged uploads the worker never processed.
+  #
+  # Objects under uploads/ are what the browser PUT directly: the user's
+  # original bytes, metadata intact — which means this is the only place a
+  # photo's GPS coordinates exist at rest. The worker DELETEs each one the
+  # moment it has written the stripped copy, so in the normal path nothing
+  # here lives more than a few seconds. This rule catches only the rows that
+  # died between upload and processing.
+  #
+  # One day, deliberately shorter than the orphan window below: an untagged
+  # age-based expiry is safe here precisely because nothing under this prefix
+  # is ever a current object, and the content is the most sensitive in the
+  # bucket. Nothing serving-side lives under uploads/, so this cannot reap a
+  # photo a row still points at.
+  rule {
+    id     = "expire-staged-uploads"
+    status = "Enabled"
+
+    filter {
+      prefix = "uploads/"
+    }
+
+    expiration {
+      days = var.staged_upload_expiration_days
+    }
+  }
 
   # Reap ONLY superseded ("orphaned") photo objects. On upload/delete the API
   # best-effort tags the previous object photo-status=orphaned; the current

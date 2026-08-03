@@ -59,10 +59,12 @@ module "avatar_storage" {
 module "activity_photo_storage" {
   source = "./modules/activity_photo_storage"
 
-  name_prefix            = local.name_prefix
-  bucket_name            = var.activity_photo_storage.bucket_name
-  orphan_expiration_days = var.activity_photo_storage.orphan_expiration_days
-  instance_role_name     = module.compute.instance_role_name
+  name_prefix                   = local.name_prefix
+  bucket_name                   = var.activity_photo_storage.bucket_name
+  cors_allowed_origins          = var.activity_photo_storage.cors_allowed_origins
+  orphan_expiration_days        = var.activity_photo_storage.orphan_expiration_days
+  staged_upload_expiration_days = var.activity_photo_storage.staged_upload_expiration_days
+  instance_role_name            = module.compute.instance_role_name
 }
 
 module "activity_video_storage" {

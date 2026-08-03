@@ -71,14 +71,21 @@ variable "avatar_storage" {
 }
 
 variable "activity_photo_storage" {
-  description = "Activity photo uploads S3 bucket config. The bucket holds uploaded activity images; an IAM policy scoped to it is attached to the backend EC2 instance role so the backend authenticates without static keys. Reaping of superseded objects is by lifecycle rule on objects tagged photo-status=orphaned (not age-based)."
+  description = "Activity photo uploads S3 bucket config. The bucket holds uploaded activity images; an IAM policy scoped to it is attached to the backend EC2 instance role so the backend authenticates without static keys. Reaping of superseded objects is by lifecycle rule on objects tagged photo-status=orphaned (not age-based). Like videos, the browser now PUTs here DIRECTLY via presigned URL, so this carries a CORS policy; staged originals under uploads/ get their own short age-based expiry because nothing current lives under that prefix."
   type = object({
-    bucket_name            = string
-    orphan_expiration_days = number
+    bucket_name                   = string
+    cors_allowed_origins          = list(string)
+    orphan_expiration_days        = number
+    staged_upload_expiration_days = number
   })
   default = {
-    bucket_name            = "prog-strength-activity-photos"
-    orphan_expiration_days = 7
+    bucket_name = "prog-strength-activity-photos"
+    cors_allowed_origins = [
+      "https://progstrength.fitness",
+      "https://prog-strength-web-*-jimmy-wallaces-projects.vercel.app",
+    ]
+    orphan_expiration_days        = 7
+    staged_upload_expiration_days = 1
   }
 }
 

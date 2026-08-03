@@ -18,3 +18,14 @@ variable "orphan_expiration_days" {
   type        = number
   default     = 7
 }
+
+variable "cors_allowed_origins" {
+  description = "Browser origins permitted to PUT directly to this bucket via presigned URL. Required since the photo upload moved off the API host: the bytes go browser->S3, so S3 itself answers the CORS preflight. Mirror the API's cors.allowed_origins — the production web origin plus the Vercel preview wildcard."
+  type        = list(string)
+}
+
+variable "staged_upload_expiration_days" {
+  description = "How long S3 retains objects under the uploads/ prefix before deleting them. These are staged originals with metadata (including GPS) still intact, which the worker normally deletes within seconds of processing; this is only the backstop for uploads that were never processed. Deliberately shorter than orphan_expiration_days — it is the most sensitive content in the bucket and nothing current ever lives under this prefix."
+  type        = number
+  default     = 1
+}
