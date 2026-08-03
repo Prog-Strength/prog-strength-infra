@@ -62,8 +62,21 @@ activity_photo_storage = {
   # UUID keys). The lifecycle rule expires ONLY objects the API tags
   # photo-status=orphaned after this many days — current photos are
   # untagged and never reaped.
-  bucket_name            = "prog-strength-activity-photos"
+  bucket_name = "prog-strength-activity-photos"
+  # The browser now PUTs photo bytes straight here, so S3 answers the CORS
+  # preflight itself. Mirrors the API's own cors.allowed_origins — production
+  # origin plus the Vercel preview wildcard.
+  cors_allowed_origins = [
+    "https://progstrength.fitness",
+    "https://prog-strength-web-*-jimmy-wallaces-projects.vercel.app",
+  ]
   orphan_expiration_days = 7
+  # Staged originals under uploads/ still carry the source's EXIF (including
+  # GPS) and are DELETEd by the worker seconds after processing. This short
+  # age-based expiry is only the backstop for uploads that were never
+  # processed; it is safe untagged because nothing current lives under that
+  # prefix.
+  staged_upload_expiration_days = 1
 }
 
 activity_video_storage = {
