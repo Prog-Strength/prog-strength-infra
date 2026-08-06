@@ -2,30 +2,58 @@
 # ps-whoop dashboard's ingestion and webhook-routing health.
 #
 # Rule A (dead ingestion) is a cause-agnostic liveness backstop: it fires when
-# zero window-driven WHOOP syncs have completed in 36h while ≥1 account is
-# connected. How the pieces interact:
-#   - `or vector(0)` is what makes the real outage fire, independent of
-#     noDataState. Whenever ≥1 account is connected the expression always
-#     evaluates to a concrete number: 0 if no window syncs happened in 36h,
-#     positive otherwise. So the actual outage — connected account(s) present
-#     but zero webhook-driven kind="window" syncs, INCLUDING the case where
-#     the api_whoop_syncs_total{kind="window"} series never existed at all —
-#     resolves to 0 and crosses the `lt 0.5` threshold. This firing does not
-#     depend on noDataState; the literal zero does the work.
-#   - `and on() (sum(api_whoop_connections{status="connected"}) > 0)` gates
-#     the expression on there being ≥1 connected account. The expression
-#     returns an empty result (→ NoData) ONLY when zero accounts are
-#     connected. Combined with noDataState: Alerting below, that
-#     zero-connections case therefore ALSO alerts — the gate does not suppress
-#     it. At the current single-user scale there is always at least one
-#     connected account, so this is acceptable; a fully-disconnected state
-#     surfaces as an alert, which doubles as a "reconnect me" signal.
+# no webhook-driven WHOOP window sync has succeeded in 48h while ≥1 account is
+# connected.
+#
+# WHY A TIMESTAMP GAUGE AND NOT increase() ON A COUNTER — this rule previously
+# evaluated:
+#
+#   sum(increase(api_whoop_syncs_total{kind="window",result="ok"}[36h]))
+#
+# and it fired CONTINUOUSLY over completely healthy ingestion. api_whoop_syncs_total
+# is a per-process counter: it resets to zero on every API restart, and its
+# {kind="window",result="ok"} child does not exist at all until that process's
+# first window sync. WHOOP nudges us roughly once a day and the API container
+# restarts about as often, so each process typically recorded exactly ONE window
+# sync and the counter sat at 1 for its whole life. increase() is last-minus-first
+# with a correction for decreases, and 1 → (restart) → 1 is neither a rise nor a
+# decrease — so it evaluated to 0 no matter how healthy ingestion was. Confirmed
+# on 2026-08-06: syncs landed at 08-04 11:07Z and 08-05 15:09Z, the second one
+# 15h inside the window, and the rule was still firing.
+#
+# The fix is to stop asking a counter "when did this last happen", a question it
+# structurally cannot answer across restarts. The API now persists
+# user_whoop_connection.last_window_sync_at on every successful kind="window"
+# sync (migration 052) and the whoopadmin exporter publishes the newest such
+# stamp across CONNECTED connections as
+# api_whoop_last_window_sync_timestamp_seconds. Durable state survives restarts,
+# so the signal is independent of process lifetime. Backfill and admin_resync
+# deliberately do not advance it — same reasoning that gives SyncSince its own
+# metric label: an operator resyncing to investigate an outage must not silence
+# the alert that reported it.
+#
+# How the pieces interact:
+#   - `or vector(0)` makes a MISSING gauge fire rather than silently pass. If
+#     the exporter is not publishing, we genuinely do not know whether ingestion
+#     is alive, and `time() - 0` is an enormous age that crosses the threshold.
+#     Fail-loud is the correct direction for a liveness monitor.
+#   - `and on() (sum(api_whoop_connections{status="connected"}) > 0)` gates on
+#     there being ≥1 connected account, so an empty or fully-disconnected DB
+#     does not page for an integration nobody is using. The expression returns
+#     an empty result (→ NoData) ONLY in that zero-connections case.
+#
+# THRESHOLD — 48h, not 36h. Observed webhook gaps run 21.7h and 28.0h against a
+# nominally ~24h cadence, so 36h left only ~8h of headroom: one night without
+# the watch, or travel delaying recovery scoring, would page legitimately. 48h
+# still catches a genuinely dead feed within two cycles.
+#
 # noDataState: Alerting on Rule A is a DELIBERATE departure from this file's
 #   usual noDataState: OK convention (documented in README.md for error
 #   counters). Rule A is a liveness monitor — it alerts on the ABSENCE of
 #   success, not on an error counter. Alerting-on-NoData covers the
-#   zero-connections case above and, with execErrState: Alerting, ensures a
-#   genuinely broken query surfaces loudly rather than silently.
+#   zero-connections case above (which doubles as a "reconnect me" signal) and,
+#   with execErrState: Alerting, ensures a genuinely broken query surfaces
+#   loudly rather than silently.
 #
 # Rule B (webhook misroute) is the fast, specific complement: it fires within
 # an hour when any api_webhook_misroute_total increments, naming the offending
@@ -48,15 +76,18 @@ groups:
         condition: C
         data:
           - refId: A
+            # A gauge read needs no lookback — unlike the increase() it
+            # replaced, the value is a point-in-time timestamp. Kept at 10m
+            # only so a single missed scrape does not blank the query.
             relativeTimeRange:
-              from: 129600
+              from: 600
               to: 0
             datasourceUid: prometheus
             model:
               refId: A
               expr: |-
                 (
-                  sum(increase(api_whoop_syncs_total{kind="window",result="ok"}[36h])) or vector(0)
+                  time() - (max(api_whoop_last_window_sync_timestamp_seconds) or vector(0))
                 )
                 and on()
                 (sum(api_whoop_connections{status="connected"}) > 0)
@@ -69,10 +100,11 @@ groups:
               refId: C
               type: threshold
               expression: A
+              # Seconds since the last successful window sync. 172800 = 48h.
               conditions:
                 - evaluator:
-                    type: lt
-                    params: [0.5]
+                    type: gt
+                    params: [172800]
         noDataState: Alerting
         execErrState: Alerting
         for: 0s
@@ -81,16 +113,17 @@ groups:
           service: whoop
         annotations:
           summary: >-
-            Zero window-driven WHOOP syncs completed in the last 36h while at
-            least one account is connected — WHOOP ingestion is dead.
+            No webhook-driven WHOOP window sync has succeeded in over 48h while
+            at least one account is connected — WHOOP ingestion is dead.
           # Grafana rejects a rule carrying only ONE of this pair — the
           # provisioner fails the whole file and ProvisioningServiceImpl
           # stops, which takes Grafana's background services down with it.
-          # Always set both, or neither. Panel 10 plots
-          # api_whoop_syncs_total by kind & result, i.e. exactly the series
-          # this rule evaluates.
+          # Always set both, or neither. Panel 17 ("Time since last window
+          # sync") plots this rule's expression exactly; it replaced the link
+          # to panel 10, which plots the per-process counter this rule no
+          # longer reads and would now send the operator to the wrong series.
           __dashboardUid__: ps-whoop
-          __panelId__: "10"
+          __panelId__: "17"
 
       - uid: whoop-webhook-misroute
         title: WHOOP webhook misrouted — warning

@@ -22,7 +22,7 @@
       "id": 2,
       "type": "stat",
       "title": "Successful syncs (24h)",
-      "description": "Count of syncs (webhook-triggered window syncs + connect-time backfills) that completed OK in the last 24h. This is the ingestion heartbeat: with any connected user it should be ≥ 1 every morning. ZERO here while the app is healthy means ingestion is dead — webhook registration lapsed, WHOOP-side outage, or every sync failing (check the panels below). Red at 0 by design; this is the number a future 'ingestion dead' alert should watch.",
+      "description": "Count of syncs (webhook-triggered window syncs + connect-time backfills) that completed OK in the last 24h. This is the ingestion heartbeat: with any connected user it should be ≥ 1 every morning. ZERO here while the app is healthy means ingestion is dead — webhook registration lapsed, WHOOP-side outage, or every sync failing (check the panels below). Red at 0 by design. NOTE: this is counter-derived and resets whenever the API restarts, so it is a useful at-a-glance rate but is NOT what the dead-ingestion alert watches — see \"Time since last window sync\" for the restart-immune liveness signal.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 4, "w": 6, "x": 0, "y": 3},
       "targets": [
@@ -263,7 +263,7 @@
       "title": "Sync attempts by kind & result",
       "description": "Every sync run per trailing 5-minute window. `window/ok` is the webhook-driven steady state; `backfill/*` appears once per connect (30-day pull). Errors here while webhooks ARE arriving point at the WHOOP data API or our token handling — scope problems, 401s, rate limits — not at delivery; each error carries the sync's wrapped error chain in an ERROR log line. Dashed yellow / red lines mark the warning (1) and critical (3) levels for error-series alerts.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 17},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -315,7 +315,7 @@
       "title": "Recovery rows by disposition",
       "description": "What each sync did with the records it fetched, per trailing 1-hour window. `upserted` is data landing (a connect-time backfill shows as a burst of ~30). The skipped_* series are data-quality signals, not errors: skipped_unscored = WHOOP hasn't scored the recovery yet (a later webhook brings it back), skipped_no_cycle = the recovery's cycle fell outside the fetched window, skipped_bad_date = a cycle we couldn't derive a calendar date from (each has a WARN log with the cycle id). A sustained skipped-heavy mix with no upserts is the 'sync green, dashboard empty' failure shape.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 17},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -330,6 +330,43 @@
           "decimals": 0,
           "min": 0,
           "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "Time since last window sync",
+      "description": "Age of the newest webhook-driven window sync across CONNECTED connections — exactly the expression the `WHOOP ingestion dead — critical` alert evaluates, which is why that rule's panel link points here. Sourced from a PERSISTED timestamp (user_whoop_connection.last_window_sync_at, exported as api_whoop_last_window_sync_timestamp_seconds), deliberately not from api_whoop_syncs_total: that counter lives in process memory and resets on every API restart, and since WHOOP nudges us roughly once a day the counter typically sat at 1 for a whole container lifetime — so increase() over it read 0 while ingestion was perfectly healthy, and the alert fired permanently. Only kind=\"window\" advances this; connect-time backfill and admin resync deliberately do not, so an operator resyncing to investigate an outage cannot silence the alert that reported it. Yellow at 36h, red at 48h (the alert threshold). A value in the tens of years means the gauge is 0 — a connected account with no window sync ever recorded.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 17},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "time() - api_whoop_last_window_sync_timestamp_seconds",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 129600},
+              {"color": "red", "value": 172800}
+            ]
+          }
         },
         "overrides": []
       }
