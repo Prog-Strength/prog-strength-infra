@@ -1,0 +1,557 @@
+{
+  "title": "Google Calendar Sync",
+  "uid": "ps-calendar-sync",
+  "tags": ["prog-strength"],
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "transparent": true,
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "### Google Calendar Sync\nEvery activity a connected user logs is mirrored onto their Google Calendar. Writes are **best-effort** — Prog Strength stays the source of truth — so a failed write is recorded as resyncable state and a boot-time reconciler repairs it. That safety net is also the trap this dashboard watches for: **if the inline path breaks, the reconciler quietly covers for it and total volume looks fine**, which is why every panel splits `trigger=inline` from `trigger=reconcile`.\n\nThe healthy shape: syncs land inline within a second of logging, `reconcile` stays near zero, failures are zero, and **freshness stays well under the alert threshold**. `skipped` is normally the *largest* series and that is correct — it counts activities from users who never connected, plus anything logged before a user connected (the no-backfill cutoff).\n\nSections: **Sync health** (volume by result, the inline-vs-reconcile split, failures by type) · **Liveness & connections** (the durable freshness stamp the alert reads, and who is connected) · **Reconciler & backlog** (whether the repair pass is running, and whether it is keeping up).\n\nDashed yellow / red lines mark warning and critical levels. Hover any panel's title (ⓘ) for details and threshold meanings."
+      }
+    },
+
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Synced (24h)",
+      "description": "Activities successfully written to a Google Calendar in the last 24h, across both triggers. On a low-traffic install this is legitimately small — and legitimately zero on a day nobody trained. Zero is therefore NOT colored red here (that would cry wolf every rest day); the liveness question is answered by 'Time since last successful sync' below, which measures the gap rather than the count.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(increase(api_calendar_syncs_total{result=\"synced\"}[24h])) or vector(0)",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "text", "value": null }, { "color": "green", "value": 1 }]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Failed syncs (24h)",
+      "description": "Writes Google rejected in the last 24h. These are recorded as resyncable and retried by the reconciler, so a small number self-heals — but every one of them means a user's calendar was briefly wrong. Yellow at 1, red at 5. A sustained non-zero value with the count climbing means the retries are ALSO failing: check 'Failures by activity type' for whether it is one sport (a render bug) or all of them (Google, or the grant).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(increase(api_calendar_syncs_total{result=\"failed\"}[24h])) or vector(0)",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Reconnects needed (24h)",
+      "description": "Syncs that failed because Google rejected the stored grant. The connection is flipped to `revoked` and the user is prompted to reconnect in the web app. One of these is a normal consequence of a user revoking access in their Google account settings; several across DIFFERENT users at once points at our OAuth client (a rotated secret, a changed consent scope), not at the users. Yellow at 1, red at 3.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(increase(api_calendar_syncs_total{result=\"reconnect_needed\"}[24h])) or vector(0)",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Time since last successful sync",
+      "description": "Age of the newest successful write across CONNECTED users — the exact expression the dead-sync alert evaluates. Green under 48h, yellow past 48h, red past 72h (the alert's threshold).\n\nThis reads a DURABLE database stamp (user_calendar_connection.last_successful_sync_at), not a counter. That distinction is load-bearing: a per-process counter resets on every deploy, so `increase()` over it reports zero change no matter how healthy the integration is. The WHOOP dead-ingestion alert shipped exactly that mistake and fired continuously over working ingestion until migration 052 replaced it with a stamp like this one.\n\nShows an enormous value (and alerts) when nobody connected has ever synced — that is deliberate fail-loud behavior, not a bug. Empty when nobody is connected at all.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(time() - (max(api_calendar_last_successful_sync_timestamp_seconds) or vector(0))) and on() (sum(api_calendar_connections{status=\"connected\"}) > 0)",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 172800 },
+              { "color": "red", "value": 259200 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Sync health",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Sync attempts by result",
+      "description": "Every attempt, bucketed by outcome over 5-minute windows.\n\nRead `skipped` as the baseline, not as a problem: it counts activities belonging to users with no calendar connection, plus anything logged before a user connected (the no-backfill cutoff). On a mostly-unconnected install it dominates, and that is correct behavior being reported honestly rather than hidden. `synced` should track actual training volume. `failed` and `reconnect_needed` should sit at zero. Dashed yellow / red lines mark the warning (1) and critical (5) levels used by the failed-sync alert.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (result) (increase(api_calendar_syncs_total[5m]))",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(1)",
+          "legendFormat": "warning (1)",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(5)",
+          "legendFormat": "critical (5)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "min": 0, "softMax": 6 },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "warning (1)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "critical (5)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "synced" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "skipped" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "text" } }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Inline vs reconciled writes",
+      "description": "Successful writes split by what triggered them — THE panel for catching a silently-broken inline path.\n\nInline should carry essentially all of it: a user logs a session and the event appears within a second. `reconcile` is the boot-time repair pass, so a spike right after a deploy is normal (it is picking up anything missed while the API was down). What is NOT normal is reconcile carrying a steady share while inline sits flat — that means the request-path hooks stopped firing and the repair pass is papering over it. Total volume would look perfectly healthy; only this split exposes it. Dashed yellow / red mark 1 and 5 reconciled writes per window.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (trigger) (increase(api_calendar_syncs_total{result=\"synced\"}[5m]))",
+          "legendFormat": "{{trigger}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(1)",
+          "legendFormat": "warning (1)",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(5)",
+          "legendFormat": "critical (5)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "min": 0, "softMax": 6 },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "warning (1)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "critical (5)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "inline" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "reconcile" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Failures by activity type",
+      "description": "Failed and reconnect-needed writes broken down by sport. The breakdown is the diagnosis: failures confined to ONE activity type point at that type's calendar renderer (a manifest producing something Google rejects), while failures across ALL types at once point at the shared path — the Google API, the network, or the OAuth grant. Dashed yellow / red mark the warning (1) and critical (5) levels.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (activity_type) (increase(api_calendar_syncs_total{result=~\"failed|reconnect_needed\"}[5m]))",
+          "legendFormat": "{{activity_type}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(1)",
+          "legendFormat": "warning (1)",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(5)",
+          "legendFormat": "critical (5)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "min": 0, "softMax": 6 },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "warning (1)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "critical (5)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Sync outcomes by activity type",
+      "description": "Successful writes by sport — the shape of what is actually reaching the calendar. Useful mainly as a sanity check against the app: if the user logged a hike this morning and `hiking` never appears here, the gap is between the hook and Google, not in the data. A type that NEVER appears despite being logged is the signal that its descriptor is not registered, or that its renderer is returning nothing.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (activity_type) (increase(api_calendar_syncs_total{result=\"synced\"}[5m]))",
+          "legendFormat": "{{activity_type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "min": 0, "softMax": 4 },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 20,
+      "type": "row",
+      "title": "Liveness & connections",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "panels": []
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Time since last successful sync",
+      "description": "The freshness gauge over time — this rule's alerting expression, plotted. It should saw-tooth: climbing steadily between sessions, dropping to near zero every time someone logs an activity. A line that climbs without ever dropping is a dead integration, and that is precisely what the critical alert fires on. Dashed yellow at 48h, red at 72h (the alert threshold).\n\nA flat line at a very large value means nobody connected has ever synced — deliberately fail-loud rather than silently absent. The series is empty when nobody is connected at all, so an install nobody uses never pages.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(time() - (max(api_calendar_last_successful_sync_timestamp_seconds) or vector(0))) and on() (sum(api_calendar_connections{status=\"connected\"}) > 0)",
+          "legendFormat": "age of last successful sync",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(172800)",
+          "legendFormat": "warning (48h)",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(259200)",
+          "legendFormat": "critical (72h)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "decimals": 0, "min": 0 },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "warning (48h)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "critical (72h)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Connections by status",
+      "description": "Calendar connections by lifecycle status, refreshed every 5 minutes from the database. `connected` is the population this whole dashboard is about, and it gates the liveness alert so an install nobody has connected never pages.\n\nWatch for `connected` stepping DOWN while `revoked` steps up by the same amount: that is a grant going bad, and it is the user-visible symptom of the reconnect-needed counter above. A drop with no matching rise means someone disconnected outright, which deletes the row.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "api_calendar_connections",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "min": 0, "softMax": 3 },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "connected" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "revoked" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": 30,
+      "type": "row",
+      "title": "Reconciler & backlog",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "panels": []
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Reconciler passes by result",
+      "description": "One increment per reconciler pass, which runs once per API boot. On a stable deployment this is sparse by design — a flat zero line here just means nothing has restarted, not that anything is broken.\n\n`error` means the pass could not even list what it owed (a database problem), so nothing was repaired that boot; the safety net was down. `cancelled` means shutdown interrupted a pass mid-flight, which is harmless — the next boot resumes. Dashed yellow / red mark the warning (1) and critical (3) levels for failed passes.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (result) (increase(api_calendar_reconcile_runs_total[1h]))",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(1)",
+          "legendFormat": "warning (1)",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(3)",
+          "legendFormat": "critical (3)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "min": 0, "softMax": 4 },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "warning (1)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "critical (3)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "ok" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "error" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          }
+        ]
+      }
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Unwritten backlog after the last pass",
+      "description": "Activities still owing a Google write when the last reconciler pass finished — non-zero only when the pass hit its per-boot cap (`[calendar_sync] reconcile_max_per_boot`, default 200).\n\nThe cap exists because each repair is a real Google API call, and an unbounded pass after a long outage could trip rate limits and take down the integration it is trying to fix. So a spike here right after an outage is the system working. What matters is the TREND: a backlog that stays pinned across successive boots means the cap is too low for the write rate and events are drifting further behind — raise `reconcile_max_per_boot`. Dashed yellow at 1 (the cap was hit at all) and red at 200 (a full page, so more is certainly behind it).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "api_calendar_reconcile_backlog",
+          "legendFormat": "backlog",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(1)",
+          "legendFormat": "warning (1)",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(200)",
+          "legendFormat": "critical (200)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "min": 0, "softMax": 10 },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "warning (1)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "critical (200)" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "backlog" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }]
+          }
+        ]
+      }
+    }
+  ]
+}
