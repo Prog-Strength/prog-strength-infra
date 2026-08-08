@@ -1,0 +1,238 @@
+# Google Calendar activity-sync alerts. Three monitors over the ps-calendar-sync
+# dashboard, ordered by how loudly they should be read.
+#
+# The integration mirrors every logged activity onto a connected user's Google
+# Calendar. Writes are best-effort with a boot-time reconciler behind them, so
+# individual failures self-heal. That safety net is exactly why the monitors
+# below watch for the two failure shapes it CANNOT heal:
+#
+#   Rule A — nothing has synced at all in 72h. Cause-agnostic liveness.
+#   Rule B — writes are failing faster than they are being repaired.
+#   Rule C — the inline path is dead and only the reconciler is working, which
+#            looks perfectly healthy in aggregate volume.
+#
+# WHY RULE A READS A TIMESTAMP GAUGE AND NOT increase() ON A COUNTER — this is
+# the single most important thing in this file, and it is written down because
+# this repository has already paid for the lesson once.
+#
+# The obvious liveness expression is:
+#
+#   sum(increase(api_calendar_syncs_total{result="synced"}[72h]))
+#
+# It does not work. api_calendar_syncs_total is a per-process counter: it resets
+# to zero on every API restart, and its {result="synced"} child does not exist
+# at all until that process's first successful sync. increase() is
+# last-minus-first with a correction for decreases, so a counter that goes
+# 3 → (restart) → 3 is neither a rise nor a decrease and evaluates to 0 no
+# matter how healthy the integration is. On a low-traffic install that deploys
+# about as often as it syncs, that is the common case, not the edge case.
+#
+# The WHOOP dead-ingestion alert shipped precisely this expression and fired
+# CONTINUOUSLY over completely healthy ingestion until 2026-08-06, when it was
+# replaced by a durable stamp (api migration 052, rules-whoop.yml). A counter
+# structurally cannot answer "when did this last succeed" across restarts.
+#
+# So the API persists user_calendar_connection.last_successful_sync_at on every
+# successful write (migration 053) and an exporter publishes the newest stamp
+# across CONNECTED connections as
+# api_calendar_last_successful_sync_timestamp_seconds. Durable state survives
+# restarts, so the signal is independent of process lifetime.
+#
+# How Rule A's pieces interact:
+#   - `or vector(0)` makes a MISSING gauge fire rather than silently pass. If
+#     the exporter is not publishing we genuinely do not know whether syncing
+#     is alive, and `time() - 0` is an enormous age that crosses the threshold.
+#     Fail-loud is the correct direction for a liveness monitor.
+#   - `and on() (sum(api_calendar_connections{status="connected"}) > 0)` gates
+#     on there being at least one connected account, so an install nobody has
+#     connected does not page for a feature nobody uses. The expression returns
+#     an empty result (→ NoData) ONLY in that zero-connections case.
+#
+# THRESHOLD — 72h, not 48h. Unlike WHOOP (which pushes daily whether or not you
+# train), this integration only writes when the user LOGS something. A rest day
+# produces no syncs by design, and a long weekend away from training produces
+# none for two days without anything being wrong. 72h clears a normal training
+# gap while still catching a genuinely dead integration within three days.
+#
+# noDataState: Alerting on Rule A is a DELIBERATE departure from this file's
+#   usual noDataState: OK convention (documented in README.md for error
+#   counters). Rule A is a liveness monitor — it alerts on the ABSENCE of
+#   success, not on an error counter. Alerting-on-NoData covers the
+#   zero-connections case above and, with execErrState: Alerting, ensures a
+#   genuinely broken query surfaces loudly rather than silently.
+#
+# Rules B and C are plain counter reads, so they keep noDataState: OK — their
+# series legitimately do not exist until the first failure.
+#
+# Thresholds sit at 0.5 / 4.5 rather than 1 / 5 because increase() extrapolates
+# and can report slightly under an integer; the half-step makes "N events"
+# cross reliably.
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: calendar-sync
+    folder: Prog Strength Alerts
+    interval: 1m
+    rules:
+      - uid: calendar-sync-dead
+        title: Google Calendar sync dead — critical
+        condition: C
+        data:
+          - refId: A
+            # A gauge read needs no lookback — the value is a point-in-time
+            # timestamp. Kept at 10m only so a single missed scrape does not
+            # blank the query.
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: |-
+                (
+                  time() - (max(api_calendar_last_successful_sync_timestamp_seconds) or vector(0))
+                )
+                and on()
+                (sum(api_calendar_connections{status="connected"}) > 0)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # Seconds since the last successful sync. 259200 = 72h.
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [259200]
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 0s
+        labels:
+          severity: critical
+          service: calendar-sync
+        annotations:
+          summary: >-
+            No activity has synced to Google Calendar in over 72h while at
+            least one account is connected — calendar sync is dead.
+          # Grafana rejects a rule carrying only ONE of this pair — the
+          # provisioner fails the whole file and ProvisioningServiceImpl stops,
+          # which takes Grafana's background services down with it. Always set
+          # both, or neither. Panel 21 plots this rule's expression exactly.
+          __dashboardUid__: ps-calendar-sync
+          __panelId__: "21"
+
+      - uid: calendar-sync-failures
+        title: Google Calendar writes failing — warning
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              # Failures only. `skipped` is excluded deliberately: it is the
+              # DOMINANT outcome (every activity from a user who never
+              # connected, plus everything logged before the connection's
+              # cutoff) and counting it here would fire permanently on correct
+              # behavior. `reconnect_needed` is also excluded — a user revoking
+              # access in their Google settings is their choice, not our
+              # outage, and it has its own visible path in the web UI.
+              expr: sum by (activity_type) (increase(api_calendar_syncs_total{result="failed"}[1h]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # >4.5 ≈ 5 failures in an hour for one activity type. Set above a
+              # single transient blip because the reconciler retries failures
+              # automatically — a handful that self-heal are not worth waking
+              # anyone for. Five in an hour for one type means the retries are
+              # failing too.
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [4.5]
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        labels:
+          severity: warning
+          service: calendar-sync
+        annotations:
+          summary: >-
+            Google Calendar writes for {{ .Labels.activity_type }} activities
+            are failing repeatedly — check whether it is one activity type (a
+            renderer bug) or all of them (Google, network, or the OAuth grant).
+          # Panel 13 plots failures broken down by activity type.
+          __dashboardUid__: ps-calendar-sync
+          __panelId__: "13"
+
+      - uid: calendar-sync-inline-path-dead
+        title: Calendar sync inline path dead — warning
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 21600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              # The reconciler-is-carrying-everything shape.
+              #
+              # This is the failure the rest of the monitoring cannot see. If
+              # the request-path hooks stop firing, activities still reach the
+              # calendar on the next boot's repair pass — so total volume stays
+              # healthy, freshness stays green, and Rule A never fires. The only
+              # evidence is WHERE the writes come from.
+              #
+              # Fires when reconciled writes appear over 6h while inline writes
+              # stay at zero. The `unless` is what keeps this quiet in the
+              # normal case: a deploy that repairs a couple of activities also
+              # has inline traffic around it, so the rule only survives when
+              # inline is genuinely silent.
+              expr: |-
+                (sum(increase(api_calendar_syncs_total{result="synced",trigger="reconcile"}[6h])) > 2)
+                unless
+                (sum(increase(api_calendar_syncs_total{result="synced",trigger="inline"}[6h])) > 0)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: Alerting
+        # Held for 30m: a boot reconciler burst legitimately precedes the first
+        # inline write after a deploy, and this must not fire in that window.
+        for: 30m
+        labels:
+          severity: warning
+          service: calendar-sync
+        annotations:
+          summary: >-
+            Calendar events are only reaching Google via the boot reconciler —
+            the inline sync hooks appear to have stopped firing. Aggregate
+            volume looks healthy, so check the inline-vs-reconciled panel.
+          # Panel 12 is the inline-vs-reconcile split this rule reads.
+          __dashboardUid__: ps-calendar-sync
+          __panelId__: "12"
