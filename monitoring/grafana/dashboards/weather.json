@@ -444,6 +444,112 @@
         },
         "overrides": []
       }
+    },
+    {
+      "id": 103,
+      "type": "row",
+      "title": "Activity Capture",
+      "description": "Did the per-activity conditions capture actually run? Two gauges published by the exporter from durable SQLite (rows in activity_weather), plus the disposition of every capture attempt — this is the row you watch a cmd/weather-backfill run through. One thing here will otherwise look like a bug: activity captures deliberately do NOT advance api_weather_last_success_timestamp_seconds, because historical readings never touch weather_cache — they are stored permanently in activity_weather instead. So a backfill can run all day while 'Time since last successful call' in Integration Health climbs, and that is correct: that gauge measures TILE liveness, not capture liveness.",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 51},
+      "panels": []
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Activities with weather",
+      "description": "Activities holding a stored 'ok' reading (api_weather_activities_with_weather). A gauge over durable SQLite rather than an in-process counter, so it survives an API restart — the same reason the budget ledger is persisted. It only climbs: one row per outdoor GPS activity, written at import or by cmd/weather-backfill, and never refreshed because historical weather does not change. Bad looks like: flat while 'Pending capture' is also flat during a backfill — rows are not being written at all.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 52},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "api_weather_activities_with_weather",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Pending capture",
+      "description": "Eligible outdoor GPS activities with no activity_weather row yet (api_weather_activities_pending_capture) — the work cmd/weather-backfill has left, and the same number --dry-run prints before you approve the spend. Trending to zero IS backfill progress; a non-zero value is not an error at any level, which is why nothing here alerts. It can also rise on its own when an activity is retagged outdoor, or when an import-time capture failed and left no row. Bad looks like: sitting flat while a backfill is running — the run is resolving nothing, so check 'Captures by result' beside it.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 52},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "api_weather_activities_pending_capture",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Captures by result (24h)",
+      "description": "Capture attempts over the trailing 24h by disposition, stacked. ok stored a reading; no_coordinates and unavailable are terminal rows the backfill writes deliberately and never retries (position cannot be re-derived; the provider has no history that far back); failed is transient — a timeout, a 5xx, or an exhausted budget — and leaves NO row, so those activities stay pending and the next run picks them up. Bad looks like: a rising failed band during a backfill. That is the signal to stop the run and look, before it spends the rest of the day's budget on calls that store nothing.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 52},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (result) (increase(api_weather_activity_captures_total[24h]))",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
     }
   ]
 }
