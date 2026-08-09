@@ -33,8 +33,11 @@
 # not exist yet (provider errors before the first error). A scrape gap or a
 # not-yet-incremented series must not page: the liveness rule above owns
 # "metrics are missing", and having exactly one owner for that failure mode is
-# what keeps a Prometheus hiccup from paging five times at once. They also keep
-# execErrState: OK for the same single-owner reason.
+# what keeps a Prometheus hiccup from paging five times at once. NoData is a
+# different failure from ExecErr, though: EVERY rule in this file sets
+# execErrState: Alerting, same as every other rules file in this repo — a
+# broken query (metric renamed, PromQL typo) is not a benign absence of data
+# and must surface loudly rather than silently disable the alert.
 #
 # THRESHOLD 5.5 ON PROVIDER ERRORS — not 5 or 6: the README's midpoint
 # convention. increase() extrapolates and can report slightly under or over an
@@ -78,7 +81,7 @@ groups:
                     type: gt
                     params: [0.75]
         noDataState: OK
-        execErrState: OK
+        execErrState: Alerting
         # 10m: utilization only ever rises within a UTC day, so this is not
         # about flapping — it is about not paging on a single scrape's blip.
         for: 10m
@@ -119,7 +122,7 @@ groups:
                     type: gt
                     params: [0.90]
         noDataState: OK
-        execErrState: OK
+        execErrState: Alerting
         for: 5m
         labels:
           severity: critical
@@ -158,7 +161,7 @@ groups:
                     type: gt
                     params: [0.5]
         noDataState: OK
-        execErrState: OK
+        execErrState: Alerting
         for: 5m
         labels:
           severity: critical
@@ -246,7 +249,7 @@ groups:
                     type: gt
                     params: [5.5]
         noDataState: OK
-        execErrState: OK
+        execErrState: Alerting
         for: 0s
         labels:
           severity: warning
