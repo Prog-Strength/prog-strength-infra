@@ -72,6 +72,12 @@ REQUIRED_ENV_KEYS=(
   AVATAR_BUCKET_NAME
   PHOTO_BUCKET_NAME
   VIDEO_BUCKET_NAME
+  # Unlike the optional provider keys excluded from this list, which degrade
+  # predictably when absent (nutrition lookup answers 503s; the WHOOP routes
+  # simply aren't mounted), an empty OPENWEATHER_API_KEY silently blanks the
+  # weather tile — no error anywhere. That silent failure mode is exactly
+  # what this gate exists to catch.
+  OPENWEATHER_API_KEY
 )
 require_env_keys .env "${REQUIRED_ENV_KEYS[@]}"
 

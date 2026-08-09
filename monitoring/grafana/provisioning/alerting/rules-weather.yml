@@ -1,0 +1,280 @@
+# Weather integration alerts. Five monitors on the ps-weather dashboard's
+# budget, liveness, and provider-health signals.
+#
+# WHY GAUGES FROM A PERSISTED LEDGER — every expression here reads a gauge the
+# API exports from DURABLE state, not an in-process counter. The daily budget
+# ledger (calls used today, shutoff flag) lives in the database and survives
+# API restarts, and last_success_timestamp_seconds is a persisted stamp — the
+# exact lesson of the WHOOP dead-ingestion incident (see rules-whoop.yml):
+# asking a per-process counter "when did this last happen" or "how much have we
+# spent today" gives an answer that resets with the container, and this API
+# restarts roughly daily. Durable state makes the signal independent of process
+# lifetime, so a restart can neither fire a budget alert spuriously nor silence
+# a real one.
+#
+# LIVENESS (weather-integration-dead) — the query has three explicit branches:
+#   1. Enabled with at least one saved location: the first arm yields the age
+#      of the newest successful provider call, and the rule fires past 6h. The
+#      `or vector(0)` inside it covers "enabled but no success EVER recorded":
+#      time() - 0 is an enormous age that crosses the threshold.
+#   2. Disabled on purpose, or nothing to fetch: the `and on()` gates drop the
+#      result ENTIRELY — in PromQL a `> 0` filter over a series that exists
+#      but reads 0 produces an empty result, not a 0 — so the rule evaluates
+#      to NoData, and noDataState: OK keeps that silent. An integration
+#      switched off deliberately, or rollout day before anyone has saved a
+#      location, must not page. This is a deliberate departure from
+#      rules-whoop.yml's noDataState: Alerting: that rule has no absent() arm,
+#      so NoData is its only way to notice a missing exporter. Here it is not:
+#   3. Exporter not publishing at all: `absent(api_weather_enabled)` returns 1
+#      only when the series is missing entirely, and * 86401 lands it
+#      comfortably past the 21600 threshold — so exporter-down pages as a
+#      real firing alert, owned by the query's absent() arm rather than by
+#      NoData. execErrState: Alerting still covers a broken/renamed query.
+#
+# EVERY RULE KEEPS noDataState: OK — the four gauge/counter rules because they
+# read gauges the exporter publishes CONTINUOUSLY (utilization, shutoff flag)
+# or a counter family that may simply not exist yet (provider errors before
+# the first error), and a scrape gap or a not-yet-incremented series must not
+# page; the liveness rule because NoData is its deliberate "off on purpose"
+# state (branch 2 above). The liveness rule's absent() arm is the single owner
+# of "the exporter is gone", which keeps a Prometheus hiccup from paging five
+# times at once. NoData is a different failure from ExecErr, though: EVERY
+# rule sets execErrState: Alerting, same as every other rules file in this
+# repo — a broken query (metric renamed, PromQL typo) is not a benign absence
+# of data and must surface loudly rather than silently disable the alert.
+#
+# THRESHOLD 5.5 ON PROVIDER ERRORS — not 5 or 6: the README's midpoint
+# convention. increase() extrapolates and can report slightly under or over an
+# integer for a whole number of events, so a threshold AT 5 or 6 makes "the
+# 6th error in an hour" fire unreliably. 5.5 fires reliably on the 6th error
+# and never on the 5th.
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: weather
+    folder: Prog Strength Alerts
+    interval: 1m
+    rules:
+      - uid: weather-budget-warning
+        title: Weather budget utilization above 75% — warning
+        condition: C
+        data:
+          - refId: A
+            # Gauge read; 10m lookback only so a single missed scrape does not
+            # blank the query.
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: max(api_weather_budget_utilization_ratio)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.75]
+        noDataState: OK
+        execErrState: Alerting
+        # 10m: utilization only ever rises within a UTC day, so this is not
+        # about flapping — it is about not paging on a single scrape's blip.
+        for: 10m
+        labels:
+          severity: warning
+          service: weather
+        annotations:
+          summary: >-
+            Weather provider budget utilization is past 75% of the daily call
+            budget — early notice, with room to react before the auto-shutoff
+            engages at 100%.
+          __dashboardUid__: ps-weather
+          __panelId__: "1"
+
+      - uid: weather-budget-critical
+        title: Weather budget utilization above 90% — critical
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: max(api_weather_budget_utilization_ratio)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.90]
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        labels:
+          severity: critical
+          service: weather
+        annotations:
+          summary: >-
+            Weather provider budget utilization is past 90% — the auto-shutoff
+            is imminent; whatever is burning calls needs attention now.
+          __dashboardUid__: ps-weather
+          __panelId__: "1"
+
+      - uid: weather-shutoff-engaged
+        title: Weather auto-shutoff engaged — critical
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: max(api_weather_shutoff_active)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                # Gauge is 0/1; 0.5 is the unambiguous midpoint.
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        labels:
+          severity: critical
+          service: weather
+        annotations:
+          summary: >-
+            The weather daily-budget auto-shutoff has engaged — no further
+            provider calls will be made and the tile serves stale data for the
+            rest of the UTC day.
+          __dashboardUid__: ps-weather
+          __panelId__: "3"
+
+      - uid: weather-integration-dead
+        title: Weather integration dead — critical
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              # Three branches — see the liveness block in the header comment:
+              #   enabled + saved locations -> age of last success (fires > 6h)
+              #   disabled or zero locations -> empty -> NoData -> OK (silent)
+              #   exporter absent entirely -> 86401, past the 6h threshold
+              expr: |-
+                (
+                  (time() - (max(api_weather_last_success_timestamp_seconds) or vector(0)))
+                  and on() (max(api_weather_enabled) > 0)
+                  and on() (max(api_weather_saved_locations) > 0)
+                )
+                or on() (absent(api_weather_enabled) * 86401)
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # Seconds since the last successful provider call. 21600 = 6h.
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [21600]
+        # noDataState: OK — NoData is this rule's DELIBERATE quiet state: the
+        # and on() gates return an empty result when the integration is off on
+        # purpose or has no saved locations, and that must not page. The
+        # exporter-down case does not arrive as NoData here — the query's
+        # absent() arm converts it into a value past the threshold, so it
+        # pages as a real firing alert (unlike rules-whoop.yml, which has no
+        # absent() arm and therefore needs noDataState: Alerting).
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        labels:
+          severity: critical
+          service: weather
+        annotations:
+          summary: >-
+            No successful weather provider call in over 6h while the
+            integration is enabled with at least one saved location — or the
+            exporter has stopped publishing weather metrics entirely. Either
+            way, the weather integration is dead.
+          # Panel 6 ("Time since last successful call") plots this rule's
+          # liveness expression exactly. Grafana rejects a rule carrying only
+          # ONE of this annotation pair — always both, or neither.
+          __dashboardUid__: ps-weather
+          __panelId__: "6"
+
+      - uid: weather-provider-errors
+        title: Weather provider errors elevated — warning
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum(increase(api_weather_provider_calls_total{result="error"}[1h]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              # 5.5, not 5 or 6 — midpoint convention, see header comment.
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5.5]
+        noDataState: OK
+        execErrState: Alerting
+        for: 0s
+        labels:
+          severity: warning
+          service: weather
+        annotations:
+          summary: >-
+            More than 5 weather provider call errors in the last hour — a
+            flaky provider, not (yet) a dead one; the liveness rule covers the
+            dead case.
+          __dashboardUid__: ps-weather
+          __panelId__: "8"
