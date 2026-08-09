@@ -93,14 +93,14 @@
     {
       "id": 4,
       "type": "stat",
-      "title": "Projected end-of-day calls",
-      "description": "Today's call count divided by seconds elapsed in the UTC day, extrapolated to 24h — the current burn rate as an end-of-day total, so the ceiling is visible BEFORE it is hit. Early-morning values are noisy (small denominator); trust it more as the day matures. Bad looks like: a projection above the daily budget while utilization still reads green — that is the budget alert arriving hours early.",
+      "title": "Projected end-of-day budget utilization",
+      "description": "Today's burn rate extrapolated to 24h and expressed as a share of the configured daily budget (api_weather_daily_budget — nothing here goes stale if the budget changes). The elapsed-time floor of one hour (clamp_min against 3600) tames the absurd projections in the first hour after UTC midnight, but early-morning readings are still noisy; trust it more as the day matures. Yellow at 75%, red at 90%, matching this row's alert levels. Bad looks like: a projection past 100% while current utilization still reads green — that is the budget alert arriving hours early.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 4, "w": 6, "x": 6, "y": 5},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "api_weather_calls_used_today / clamp_min(time() % 86400, 1) * 86400",
+          "expr": "api_weather_calls_used_today / clamp_min(time() % 86400, 3600) * 86400 / clamp_min(api_weather_daily_budget, 1) * 100",
           "refId": "A",
           "instant": true
         }
@@ -113,14 +113,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "percent",
           "decimals": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {"color": "green", "value": null},
-              {"color": "yellow", "value": 600},
-              {"color": "red", "value": 800}
+              {"color": "yellow", "value": 75},
+              {"color": "red", "value": 90}
             ]
           }
         },
@@ -317,7 +317,7 @@
       "id": 9,
       "type": "timeseries",
       "title": "Provider latency p50/p95",
-      "description": "OpenWeather round-trip latency percentiles across all endpoints. A weather fetch happens on a user's dashboard load when the cache misses, so sustained p95 above a couple of seconds is felt directly. Bad looks like: p50 climbing toward p95 (the provider is slow for everyone, not just the tail) or p95 pinned at the client timeout (requests dying, feeding the error panel to the left).",
+      "description": "OpenWeather round-trip latency percentiles across all endpoints. A weather fetch happens on a user's dashboard load when the cache misses, so slow provider calls are felt directly. Dashed lines: WARNING 2s, CRITICAL 5s. Bad looks like: p95 sustained above the dashed yellow line, p50 climbing toward p95 (the provider is slow for everyone, not just the tail), or p95 pinned at the client timeout (requests dying, feeding the error panel to the left).",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 26},
       "targets": [
@@ -338,7 +338,15 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "custom": {"fillOpacity": 25}
+          "custom": {"fillOpacity": 25, "thresholdsStyle": {"mode": "dashed"}},
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 2},
+              {"color": "red", "value": 5}
+            ]
+          }
         },
         "overrides": []
       }

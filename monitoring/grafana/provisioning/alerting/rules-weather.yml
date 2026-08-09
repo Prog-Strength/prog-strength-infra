@@ -12,32 +12,36 @@
 # lifetime, so a restart can neither fire a budget alert spuriously nor silence
 # a real one.
 #
-# LIVENESS IS FAIL-LOUD (weather-integration-dead only):
-#   - `or vector(0)` makes a MISSING timestamp gauge fire rather than silently
-#     pass — if the exporter is not publishing, we genuinely do not know
-#     whether the integration is alive, and `time() - 0` is an enormous age
-#     that crosses the 6h threshold. Fail-loud is the correct direction for a
-#     liveness monitor.
-#   - The two `and on()` gates keep it honest: `max(api_weather_enabled) > 0`
-#     stops it paging for an integration that is switched off on purpose, and
-#     `max(api_weather_saved_locations) > 0` stops it paging when there is
-#     nothing to fetch (no saved locations means no calls means no successes,
-#     healthily). Either gate failing empties the result (NoData) — and
-#     noDataState: Alerting turns that into a page too, deliberately, because
-#     NoData here means the enabled/locations gauges themselves are missing,
-#     i.e. the exporter is down. execErrState: Alerting makes a broken query
-#     (metric renamed) surface loudly as well.
+# LIVENESS (weather-integration-dead) — the query has three explicit branches:
+#   1. Enabled with at least one saved location: the first arm yields the age
+#      of the newest successful provider call, and the rule fires past 6h. The
+#      `or vector(0)` inside it covers "enabled but no success EVER recorded":
+#      time() - 0 is an enormous age that crosses the threshold.
+#   2. Disabled on purpose, or nothing to fetch: the `and on()` gates drop the
+#      result ENTIRELY — in PromQL a `> 0` filter over a series that exists
+#      but reads 0 produces an empty result, not a 0 — so the rule evaluates
+#      to NoData, and noDataState: OK keeps that silent. An integration
+#      switched off deliberately, or rollout day before anyone has saved a
+#      location, must not page. This is a deliberate departure from
+#      rules-whoop.yml's noDataState: Alerting: that rule has no absent() arm,
+#      so NoData is its only way to notice a missing exporter. Here it is not:
+#   3. Exporter not publishing at all: `absent(api_weather_enabled)` returns 1
+#      only when the series is missing entirely, and * 86401 lands it
+#      comfortably past the 21600 threshold — so exporter-down pages as a
+#      real firing alert, owned by the query's absent() arm rather than by
+#      NoData. execErrState: Alerting still covers a broken/renamed query.
 #
-# THE OTHER FOUR KEEP noDataState: OK — they read gauges the exporter publishes
-# CONTINUOUSLY (utilization, shutoff flag) or a counter family that may simply
-# not exist yet (provider errors before the first error). A scrape gap or a
-# not-yet-incremented series must not page: the liveness rule above owns
-# "metrics are missing", and having exactly one owner for that failure mode is
-# what keeps a Prometheus hiccup from paging five times at once. NoData is a
-# different failure from ExecErr, though: EVERY rule in this file sets
-# execErrState: Alerting, same as every other rules file in this repo — a
-# broken query (metric renamed, PromQL typo) is not a benign absence of data
-# and must surface loudly rather than silently disable the alert.
+# EVERY RULE KEEPS noDataState: OK — the four gauge/counter rules because they
+# read gauges the exporter publishes CONTINUOUSLY (utilization, shutoff flag)
+# or a counter family that may simply not exist yet (provider errors before
+# the first error), and a scrape gap or a not-yet-incremented series must not
+# page; the liveness rule because NoData is its deliberate "off on purpose"
+# state (branch 2 above). The liveness rule's absent() arm is the single owner
+# of "the exporter is gone", which keeps a Prometheus hiccup from paging five
+# times at once. NoData is a different failure from ExecErr, though: EVERY
+# rule sets execErrState: Alerting, same as every other rules file in this
+# repo — a broken query (metric renamed, PromQL typo) is not a benign absence
+# of data and must surface loudly rather than silently disable the alert.
 #
 # THRESHOLD 5.5 ON PROVIDER ERRORS — not 5 or 6: the README's midpoint
 # convention. increase() extrapolates and can report slightly under or over an
@@ -185,10 +189,17 @@ groups:
             datasourceUid: prometheus
             model:
               refId: A
+              # Three branches — see the liveness block in the header comment:
+              #   enabled + saved locations -> age of last success (fires > 6h)
+              #   disabled or zero locations -> empty -> NoData -> OK (silent)
+              #   exporter absent entirely -> 86401, past the 6h threshold
               expr: |-
-                (time() - (max(api_weather_last_success_timestamp_seconds) or vector(0)))
-                and on() (max(api_weather_enabled) > 0)
-                and on() (max(api_weather_saved_locations) > 0)
+                (
+                  (time() - (max(api_weather_last_success_timestamp_seconds) or vector(0)))
+                  and on() (max(api_weather_enabled) > 0)
+                  and on() (max(api_weather_saved_locations) > 0)
+                )
+                or on() (absent(api_weather_enabled) * 86401)
               instant: true
               intervalMs: 1000
               maxDataPoints: 43200
@@ -203,9 +214,14 @@ groups:
                 - evaluator:
                     type: gt
                     params: [21600]
-        # Deliberate departure from this file's noDataState: OK convention —
-        # see the liveness block in the header comment.
-        noDataState: Alerting
+        # noDataState: OK — NoData is this rule's DELIBERATE quiet state: the
+        # and on() gates return an empty result when the integration is off on
+        # purpose or has no saved locations, and that must not page. The
+        # exporter-down case does not arrive as NoData here — the query's
+        # absent() arm converts it into a value past the threshold, so it
+        # pages as a real firing alert (unlike rules-whoop.yml, which has no
+        # absent() arm and therefore needs noDataState: Alerting).
+        noDataState: OK
         execErrState: Alerting
         for: 0s
         labels:
@@ -214,8 +230,9 @@ groups:
         annotations:
           summary: >-
             No successful weather provider call in over 6h while the
-            integration is enabled and at least one location is saved — the
-            weather integration is dead.
+            integration is enabled with at least one saved location — or the
+            exporter has stopped publishing weather metrics entirely. Either
+            way, the weather integration is dead.
           # Panel 6 ("Time since last successful call") plots this rule's
           # liveness expression exactly. Grafana rejects a rule carrying only
           # ONE of this annotation pair — always both, or neither.
