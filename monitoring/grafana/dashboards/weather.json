@@ -1,0 +1,441 @@
+{
+  "title": "Weather",
+  "uid": "ps-weather",
+  "tags": ["prog-strength"],
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": {"from": "now-24h", "to": "now"},
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Budget & Cost Control",
+      "description": "How close the integration is to the auto-shutoff. The provider allows a fixed number of calls per UTC day; the API tracks usage in a persisted ledger and shuts itself off before the paid tier is touched. Everything in this row answers one question: will we hit the ceiling today, and how soon?",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "gauge",
+      "title": "Budget utilization",
+      "description": "Share of today's provider-call budget already spent (api_weather_budget_utilization_ratio, from the persisted daily ledger). Yellow at 75%, red at 90% — the same levels the budget alerts fire at. Bad looks like: red before mid-afternoon, meaning the shutoff will engage and the tile serves stale data for the rest of the UTC day.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 1},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "api_weather_budget_utilization_ratio * 100",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 75},
+              {"color": "red", "value": 90}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Auto-shutoff status",
+      "description": "api_weather_shutoff_active: whether the daily-budget circuit breaker has engaged. SHUT OFF (red) means no more provider calls until the UTC day rolls over — the tile serves whatever the cache holds, marked stale. Bad looks like: SHUT OFF at all; it should be rare enough that each occurrence is worth understanding via the 'Calls by endpoint' panel.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "api_weather_shutoff_active",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {"text": "ACTIVE", "color": "green", "index": 0},
+                "1": {"text": "SHUT OFF", "color": "red", "index": 1}
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Projected end-of-day calls",
+      "description": "Today's call count divided by seconds elapsed in the UTC day, extrapolated to 24h — the current burn rate as an end-of-day total, so the ceiling is visible BEFORE it is hit. Early-morning values are noisy (small denominator); trust it more as the day matures. Bad looks like: a projection above the daily budget while utilization still reads green — that is the budget alert arriving hours early.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 5},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "api_weather_calls_used_today / clamp_min(time() % 86400, 1) * 86400",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 600},
+              {"color": "red", "value": 800}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Calls used today vs. budget",
+      "description": "The solid line is api_weather_calls_used_today (resets at UTC midnight); the dashed lines are the configured daily budget and its 75% / 90% alert levels, derived from the api_weather_daily_budget gauge rather than hardcoded, so a config change moves them automatically. Bad looks like: the solid line bending toward the dashed red line before evening — the slope tells you when the shutoff will engage.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 1},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "api_weather_calls_used_today",
+          "legendFormat": "used",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "api_weather_daily_budget",
+          "legendFormat": "budget",
+          "refId": "B"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "api_weather_daily_budget * 0.75",
+          "legendFormat": "warning level",
+          "refId": "C"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "api_weather_daily_budget * 0.9",
+          "legendFormat": "critical level",
+          "refId": "D"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "custom": {"fillOpacity": 10}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "budget"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "blue"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}},
+              {"id": "custom.fillOpacity", "value": 0}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "warning level"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "yellow"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}},
+              {"id": "custom.fillOpacity", "value": 0}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "critical level"},
+            "properties": [
+              {"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}},
+              {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}},
+              {"id": "custom.fillOpacity", "value": 0}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Calls by endpoint (1h increase)",
+      "description": "Provider calls per trailing hour, split by endpoint (current / hourly / daily / geocode_direct / geocode_reverse) — where the budget is actually going. Geocode calls should be rare (only when a location is added or resolved); the forecast endpoints should track tile refresh cadence. Bad looks like: one endpoint dominating far beyond its expected cadence — a refresh loop or cache bypass burning budget.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 9},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (endpoint) (increase(api_weather_provider_calls_total[1h]))",
+          "legendFormat": "{{endpoint}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 101,
+      "type": "row",
+      "title": "Integration Health",
+      "description": "Is the integration actually working? Liveness (time since the last successful provider call), the disposition of every tile request, and the provider's error and latency behavior. This row is what the liveness and provider-error alerts watch.",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 17},
+      "panels": []
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Time since last successful call",
+      "description": "Age of the newest successful provider call (api_weather_last_success_timestamp_seconds, persisted so it survives API restarts). Red at 6h — the same threshold as the weather-integration-dead alert, whose panel link points here. A value in the tens of years means the gauge reads 0: enabled with saved locations but no successful call ever recorded, or the exporter is not publishing. Bad looks like: anything red while the integration is enabled and has saved locations.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 18},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "time() - (max(api_weather_last_success_timestamp_seconds) or vector(0))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 21600}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Request outcomes",
+      "description": "Every weather tile request by disposition. Healthy steady state is almost all cache_hit with a thin served band (fresh provider fetches). A rising served_stale or budget_exhausted band is the visual signature of degradation: users still see weather, but it is aging. failed means the user saw an error; disabled means the feature flag or key is off. Bad looks like: the green cache_hit band shrinking while stale/exhausted bands grow.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 18, "x": 6, "y": 18},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (outcome) (rate(api_weather_requests_total[5m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Provider errors by endpoint",
+      "description": "Failed OpenWeather calls per endpoint. Should be flat zero; occasional blips are provider flakiness (each has an ERROR log line with the wrapped error). All endpoints erroring together suggests a bad key, egress trouble, or a provider outage; a single endpoint erroring suggests a payload/contract change on that endpoint. The weather-provider-errors alert fires on more than 5 errors in an hour and links here.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 26},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (endpoint) (rate(api_weather_provider_calls_total{result=\"error\"}[5m]))",
+          "legendFormat": "{{endpoint}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "custom": {"fillOpacity": 25}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Provider latency p50/p95",
+      "description": "OpenWeather round-trip latency percentiles across all endpoints. A weather fetch happens on a user's dashboard load when the cache misses, so sustained p95 above a couple of seconds is felt directly. Bad looks like: p50 climbing toward p95 (the provider is slow for everyone, not just the tail) or p95 pinned at the client timeout (requests dying, feeding the error panel to the left).",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 26},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(api_weather_provider_latency_seconds_bucket[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(api_weather_provider_latency_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "custom": {"fillOpacity": 25}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 102,
+      "type": "row",
+      "title": "Cache Efficiency",
+      "description": "The cost lever: every cache hit is a provider call not spent. A collapsing hit rate is the LEADING indicator of a budget breach — it shows up here before utilization moves, because each miss becomes a provider call only on the next tile load. Watch this row when tuning TTLs.",
+      "collapsed": false,
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 34},
+      "panels": []
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Cache hit rate (24h)",
+      "description": "Share of cache reads answered by a fresh entry over the last 24h (write events excluded from the denominator). With a handful of saved locations and sane TTLs this should sit comfortably green once warmed. Bad looks like: yellow or red after the first day — every point of hit rate lost converts directly into provider calls, so a cold cache is a budget breach in the making.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 35},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "100 * sum(increase(api_weather_cache_events_total{event=\"hit\"}[24h])) / clamp_min(sum(increase(api_weather_cache_events_total{event=~\"hit|miss|stale|corrupt\"}[24h])), 1)",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 40},
+              {"color": "green", "value": 70}
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Cache events by type",
+      "description": "Cache read dispositions over time. miss = first fetch for a location/endpoint pair; stale = TTL expired, a provider re-fetch follows (or a stale serve if the budget is exhausted); corrupt and read_error should be flat zero — anything else means the cache store itself is in trouble, not the data in it. Bad looks like: the miss/stale bands out-growing hit, or any corrupt/read_error at all.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 18, "x": 6, "y": 35},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (event) (rate(api_weather_cache_events_total[5m]))",
+          "legendFormat": "{{event}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Cache write errors",
+      "description": "Failed cache writes — metered precisely because nothing else surfaces a dying cache: a request whose cache write fails still succeeds from the user's point of view, so the only outward symptom is the hit rate quietly collapsing and provider calls (and budget burn) climbing. Should be flat zero. Bad looks like: ANY sustained non-zero rate — correlate with disk space or SQLite lock contention.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 43},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(rate(api_weather_cache_writes_total{result=\"error\"}[5m]))",
+          "legendFormat": "write errors",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "custom": {"fillOpacity": 25}
+        },
+        "overrides": []
+      }
+    }
+  ]
+}
