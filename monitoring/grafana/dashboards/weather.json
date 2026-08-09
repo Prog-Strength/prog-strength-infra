@@ -94,13 +94,13 @@
       "id": 4,
       "type": "stat",
       "title": "Projected end-of-day budget utilization",
-      "description": "Today's burn rate extrapolated to 24h and expressed as a share of the configured daily budget (api_weather_daily_budget — nothing here goes stale if the budget changes). The elapsed-time floor of one hour (clamp_min against 3600) tames the absurd projections in the first hour after UTC midnight, but early-morning readings are still noisy; trust it more as the day matures. Yellow at 75%, red at 90%, matching this row's alert levels. Bad looks like: a projection past 100% while current utilization still reads green — that is the budget alert arriving hours early.",
+      "description": "Today's burn rate extrapolated to 24h and expressed as a share of the configured daily budget (api_weather_daily_budget — nothing here goes stale if the budget changes). The elapsed-time floor of one hour (clamp_min against 3600; the `* 0 +` dance lifts the scalar elapsed-seconds onto the series, since clamp_min only accepts an instant vector) tames the absurd projections in the first hour after UTC midnight, but early-morning readings are still noisy; trust it more as the day matures. Yellow at 75%, red at 90%, matching this row's alert levels. Bad looks like: a projection past 100% while current utilization still reads green — that is the budget alert arriving hours early.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 4, "w": 6, "x": 6, "y": 5},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "expr": "api_weather_calls_used_today / clamp_min(time() % 86400, 3600) * 86400 / clamp_min(api_weather_daily_budget, 1) * 100",
+          "expr": "api_weather_calls_used_today * 86400 / clamp_min(api_weather_calls_used_today * 0 + time() % 86400, 3600) / clamp_min(api_weather_daily_budget, 1) * 100",
           "refId": "A",
           "instant": true
         }

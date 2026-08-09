@@ -72,11 +72,11 @@ REQUIRED_ENV_KEYS=(
   AVATAR_BUCKET_NAME
   PHOTO_BUCKET_NAME
   VIDEO_BUCKET_NAME
-  # Unlike the optional provider keys excluded from this list, which when
-  # absent degrade to a loud, well-defined 503 at their endpoints (graceful
-  # for the app, loud for the caller), an empty OPENWEATHER_API_KEY silently
-  # blanks the weather tile — no error anywhere. That silent failure mode is
-  # exactly what this gate exists to catch.
+  # Unlike the optional provider keys excluded from this list, which degrade
+  # predictably when absent (nutrition lookup answers 503s; the WHOOP routes
+  # simply aren't mounted), an empty OPENWEATHER_API_KEY silently blanks the
+  # weather tile — no error anywhere. That silent failure mode is exactly
+  # what this gate exists to catch.
   OPENWEATHER_API_KEY
 )
 require_env_keys .env "${REQUIRED_ENV_KEYS[@]}"
