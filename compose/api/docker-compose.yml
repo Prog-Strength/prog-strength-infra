@@ -145,6 +145,12 @@ services:
       - WHOOP_CLIENT_ID=${WHOOP_CLIENT_ID:-}
       - WHOOP_CLIENT_SECRET=${WHOOP_CLIENT_SECRET:-}
       - WHOOP_TOKEN_ENC_KEY=${WHOOP_TOKEN_ENC_KEY:-}
+      # OpenWeather One Call + Geocoding key (config.toml [weather] references
+      # it as a ${VAR} label). Deploy-gated in REQUIRED_ENV_KEYS: an empty key
+      # silently disables the weather tile, which is exactly the failure the
+      # gate exists to catch. The require_env_keys gate validates .env on the
+      # HOST, not the container, so this forward line is load-bearing.
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
     volumes:
       # Persist SQLite database on host. Resolves to the directory next to
       # this compose file (prog-strength-infra/compose/api/data on prod).

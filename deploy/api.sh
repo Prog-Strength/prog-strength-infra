@@ -72,6 +72,10 @@ REQUIRED_ENV_KEYS=(
   AVATAR_BUCKET_NAME
   PHOTO_BUCKET_NAME
   VIDEO_BUCKET_NAME
+  # Unlike the optional providers above, the weather tile has no graceful
+  # degradation contract: an empty key silently disables the dashboard tile,
+  # which is exactly the keyless-integration failure this gate exists to catch.
+  OPENWEATHER_API_KEY
 )
 require_env_keys .env "${REQUIRED_ENV_KEYS[@]}"
 
