@@ -352,12 +352,36 @@
       }
     },
     {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Request outcomes by source",
+      "description": "The only panel that separates the two surfaces sharing one provider budget, one cache, and one daily ceiling: the dashboard tile and the chat agent. Open it when the Budget & Cost Control row looks hot and the question is WHICH surface is spending — every other weather series is deliberately unlabelled, because the budget they measure is not partitioned and splitting them would imply an isolation that does not exist. Read it in terms of cost: cache_hit spends nothing, while served and served_stale each consumed a provider call. source is a closed two-value set (tile | agent) validated by the API handler, so a third value never appears and a missing one means an older binary. Bad looks like: an agent served band big enough that the tile is the one hitting budget_exhausted — chat outbidding the dashboard for a budget neither of them owns.",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 34},
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (source, outcome) (rate(api_weather_requests_total[5m]))",
+          "legendFormat": "{{source}} · {{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "custom": {"stacking": {"mode": "normal", "group": "A"}, "fillOpacity": 50}
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 102,
       "type": "row",
       "title": "Cache Efficiency",
       "description": "The cost lever: every cache hit is a provider call not spent. A collapsing hit rate is the LEADING indicator of a budget breach — it shows up here before utilization moves, because each miss becomes a provider call only on the next tile load. Watch this row when tuning TTLs.",
       "collapsed": false,
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 34},
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 42},
       "panels": []
     },
     {
@@ -366,7 +390,7 @@
       "title": "Cache hit rate (24h)",
       "description": "Share of cache reads answered by a fresh entry over the last 24h (write events excluded from the denominator). With a handful of saved locations and sane TTLs this should sit comfortably green once warmed. Bad looks like: yellow or red after the first day — every point of hit rate lost converts directly into provider calls, so a cold cache is a budget breach in the making.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 35},
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 43},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -403,7 +427,7 @@
       "title": "Cache events by type",
       "description": "Cache read dispositions over time. miss = first fetch for a location/endpoint pair; stale = TTL expired, a provider re-fetch follows (or a stale serve if the budget is exhausted); corrupt and read_error should be flat zero — anything else means the cache store itself is in trouble, not the data in it. Bad looks like: the miss/stale bands out-growing hit, or any corrupt/read_error at all.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 18, "x": 6, "y": 35},
+      "gridPos": {"h": 8, "w": 18, "x": 6, "y": 43},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -427,7 +451,7 @@
       "title": "Cache write errors",
       "description": "Failed cache writes — metered precisely because nothing else surfaces a dying cache: a request whose cache write fails still succeeds from the user's point of view, so the only outward symptom is the hit rate quietly collapsing and provider calls (and budget burn) climbing. Should be flat zero. Bad looks like: ANY sustained non-zero rate — correlate with disk space or SQLite lock contention.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 43},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 51},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -451,7 +475,7 @@
       "title": "Activity Capture",
       "description": "Did the per-activity conditions capture actually run? Two gauges published by the exporter from durable SQLite (rows in activity_weather), plus the disposition of every capture attempt — this is the row you watch a cmd/weather-backfill run through. One thing here will otherwise look like a bug: activity captures deliberately do NOT advance api_weather_last_success_timestamp_seconds, because historical readings never touch weather_cache — they are stored permanently in activity_weather instead. So a backfill can run all day while 'Time since last successful call' in Integration Health climbs, and that is correct: that gauge measures TILE liveness, not capture liveness.",
       "collapsed": false,
-      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 51},
+      "gridPos": {"h": 1, "w": 24, "x": 0, "y": 59},
       "panels": []
     },
     {
@@ -460,7 +484,7 @@
       "title": "Activities with weather",
       "description": "Activities holding a stored 'ok' reading (api_weather_activities_with_weather). A gauge over durable SQLite rather than an in-process counter, so it survives an API restart — the same reason the budget ledger is persisted. It only climbs: one row per outdoor GPS activity, written at import or by cmd/weather-backfill, and never refreshed because historical weather does not change. Bad looks like: flat while 'Pending capture' is also flat during a backfill — rows are not being written at all.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 52},
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 60},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -496,7 +520,7 @@
       "title": "Pending capture",
       "description": "Eligible outdoor GPS activities with no activity_weather row yet (api_weather_activities_pending_capture) — the work cmd/weather-backfill has left, and the same number --dry-run prints before you approve the spend. Trending to zero IS backfill progress; a non-zero value is not an error at any level, which is why nothing here alerts. It can also rise on its own when an activity is retagged outdoor, or when an import-time capture failed and left no row. Bad looks like: sitting flat while a backfill is running — the run is resolving nothing, so check 'Captures by result' beside it.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 52},
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 60},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
@@ -532,7 +556,7 @@
       "title": "Captures by result (24h)",
       "description": "Capture attempts over the trailing 24h by disposition, stacked. ok stored a reading; no_coordinates and unavailable are terminal rows the backfill writes deliberately and never retries (position cannot be re-derived; the provider has no history that far back); failed is transient — a timeout, a 5xx, or an exhausted budget — and leaves NO row, so those activities stay pending and the next run picks them up. Bad looks like: a rising failed band during a backfill. That is the signal to stop the run and look, before it spends the rest of the day's budget on calls that store nothing.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 52},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 60},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
