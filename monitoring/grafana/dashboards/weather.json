@@ -224,7 +224,7 @@
       "id": 101,
       "type": "row",
       "title": "Integration Health",
-      "description": "Is the integration actually working? Liveness (time since the last successful provider call), the disposition of every tile request, and the provider's error and latency behavior. This row is what the liveness and provider-error alerts watch.",
+      "description": "Is the integration actually working? Liveness (time since the last successful provider call), the disposition of every weather request, and the provider's error and latency behavior. This row is what the liveness and provider-error alerts watch.",
       "collapsed": false,
       "gridPos": {"h": 1, "w": 24, "x": 0, "y": 17},
       "panels": []
@@ -269,7 +269,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "Request outcomes",
-      "description": "Every weather tile request by disposition. Healthy steady state is almost all cache_hit with a thin served band (fresh provider fetches). A rising served_stale or budget_exhausted band is the visual signature of degradation: users still see weather, but it is aging. failed means the user saw an error; disabled means the feature flag or key is off. Bad looks like: the green cache_hit band shrinking while stale/exhausted bands grow.",
+      "description": "Every weather request by disposition, tile and agent together. Healthy steady state is almost all cache_hit with a thin served band (fresh provider fetches). A rising served_stale or budget_exhausted band is the visual signature of degradation: users still see weather, but it is aging. failed means the user saw an error; disabled means the feature flag or key is off. Bad looks like: the green cache_hit band shrinking while stale/exhausted bands grow.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 18, "x": 6, "y": 18},
       "targets": [
@@ -355,14 +355,14 @@
       "id": 16,
       "type": "timeseries",
       "title": "Request outcomes by source",
-      "description": "The only panel that separates the two surfaces sharing one provider budget, one cache, and one daily ceiling: the dashboard tile and the chat agent. Open it when the Budget & Cost Control row looks hot and the question is WHICH surface is spending — every other weather series is deliberately unlabelled, because the budget they measure is not partitioned and splitting them would imply an isolation that does not exist. Read it in terms of cost: cache_hit spends nothing, while served and served_stale each consumed a provider call. source is a closed two-value set (tile | agent) validated by the API handler, so a third value never appears and a missing one means an older binary. Bad looks like: an agent served band big enough that the tile is the one hitting budget_exhausted — chat outbidding the dashboard for a budget neither of them owns.",
+      "description": "Weather requests by the surface that asked — how tile and agent divide one shared budget. Counts requests, not calls: a served can spend 1–3 calls and a served_stale none, so read spend off 'Calls by endpoint' above. The agent's ?place= records twice (geocode + readings) when the place is not saved, inflating that band; capture spends the same ledger but records nothing here — see Activity Capture. Bad looks like: agent-heavy traffic early in the UTC day, tile budget_exhausted later.",
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "gridPos": {"h": 8, "w": 24, "x": 0, "y": 34},
       "targets": [
         {
           "datasource": {"type": "prometheus", "uid": "prometheus"},
           "expr": "sum by (source, outcome) (rate(api_weather_requests_total[5m]))",
-          "legendFormat": "{{source}} · {{outcome}}",
+          "legendFormat": "{{source}} / {{outcome}}",
           "refId": "A"
         }
       ],
