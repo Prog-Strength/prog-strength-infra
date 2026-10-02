@@ -9,16 +9,14 @@
 # The permission policy is the union of what the workflows do:
 #   - terraform plan/apply for this repo's stack
 #   - ECR image push from api/agent/mcp releases
-#   - prog-strength-developer's platform ops (EC2 workers, SSM, secrets reads)
 # Mutating IAM access is fenced to prog-strength-* resource prefixes so a
 # stolen CI token can manage this project's infrastructure but cannot
 # escalate to account takeover.
 
 data "aws_caller_identity" "current" {}
 
-# The provider predates this module (created manually; also read by
-# prog-strength-developer's data source). It is IMPORTED, not recreated —
-# see the import block in the root module's imports.tf.
+# The provider predates this module (created manually). It is IMPORTED,
+# not recreated — see the import block in the root module's imports.tf.
 resource "aws_iam_openid_connect_provider" "github" {
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
@@ -59,11 +57,9 @@ resource "aws_iam_role" "github_actions" {
 
 data "aws_iam_policy_document" "permissions" {
   # EC2/VPC: this repo's terraform owns the whole network + instance stack
-  # (VPC, subnets, IGW, route tables, SGs, instance, EIP, volumes);
-  # developer CI runs/terminates worker instances and manages launch
-  # templates. Service-level grant — most EC2 networking actions don't
-  # honor resource-ARN conditions cleanly (same reasoning as the
-  # EC2ManagerInfra statement in developer's previous role).
+  # (VPC, subnets, IGW, route tables, SGs, instance, EIP, volumes).
+  # Service-level grant — most EC2 networking actions don't honor
+  # resource-ARN conditions cleanly.
   statement {
     sid       = "EC2"
     actions   = ["ec2:*"]
@@ -86,9 +82,9 @@ data "aws_iam_policy_document" "permissions" {
     resources = ["arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.current.account_id}:repository/prog-strength-*"]
   }
 
-  # Terraform state (prog-strength-terraform-backend — used by both infra
-  # and developer stacks) plus the litestream/tcx/avatar data buckets this
-  # repo manages. Fenced by bucket name prefix.
+  # Terraform state (prog-strength-terraform-backend) plus the
+  # litestream/tcx/avatar data buckets this repo manages. Fenced by
+  # bucket name prefix.
   statement {
     sid     = "S3"
     actions = ["s3:*"]
@@ -99,7 +95,7 @@ data "aws_iam_policy_document" "permissions" {
   }
 
   # Read-only IAM everywhere: terraform refresh of roles, profiles,
-  # policies, and the OIDC provider data source in developer's stack.
+  # policies, and the OIDC provider.
   statement {
     sid       = "IAMRead"
     actions   = ["iam:Get*", "iam:List*"]
@@ -107,10 +103,10 @@ data "aws_iam_policy_document" "permissions" {
   }
 
   # Mutating IAM fenced to prog-strength-* names. Covers this repo's
-  # instance role/profile/policies, developer's worker+manager roles, and
-  # this role itself (so future policy updates apply from CI rather than
-  # requiring an admin re-bootstrap — the trust policy already restricts
-  # who can assume the role, so self-PutRolePolicy adds no new principal).
+  # instance role/profile/policies and this role itself (so future policy
+  # updates apply from CI rather than requiring an admin re-bootstrap —
+  # the trust policy already restricts who can assume the role, so
+  # self-PutRolePolicy adds no new principal).
   statement {
     sid = "IAMManageProjectResources"
     actions = [
@@ -143,8 +139,8 @@ data "aws_iam_policy_document" "permissions" {
     ]
   }
 
-  # PassRole fenced the same way: the backend instance role and
-  # developer's worker/manager roles are passed to EC2 at apply time.
+  # PassRole fenced the same way: the backend instance role is passed
+  # to EC2 at apply time.
   statement {
     sid       = "IAMPassProjectRoles"
     actions   = ["iam:PassRole"]
@@ -166,8 +162,7 @@ data "aws_iam_policy_document" "permissions" {
     resources = [aws_iam_openid_connect_provider.github.arn]
   }
 
-  # Log groups + retention from this repo's logging module; stream reads
-  # for developer's terraform refresh.
+  # Log groups + retention from this repo's logging module.
   statement {
     sid       = "CloudWatchLogs"
     actions   = ["logs:*"]
@@ -188,15 +183,8 @@ data "aws_iam_policy_document" "permissions" {
     resources = ["*"]
   }
 
-  # AWS-published AMI parameters (developer's al2023 lookup).
-  statement {
-    sid       = "SSMParameterRead"
-    actions   = ["ssm:GetParameter", "ssm:GetParameters"]
-    resources = ["arn:aws:ssm:${var.aws_region}::parameter/aws/service/*"]
-  }
-
-  # developer's deploy-manager.yml pushes compose updates to the manager
-  # instance via SSM RunCommand and polls the invocation.
+  # deploy-caddy.yml (and the api/mcp/agent deploy flows) push updates to
+  # the backend instance via SSM RunCommand and poll the invocation.
   statement {
     sid = "SSMSendCommand"
     actions = [
@@ -211,28 +199,14 @@ data "aws_iam_policy_document" "permissions" {
     ]
   }
 
-  # developer's terraform refreshes two data "aws_secretsmanager_secret"
-  # blocks each plan. Describe only — CI never reads secret values.
-  statement {
-    sid = "SecretsManagerDescribe"
-    actions = [
-      "secretsmanager:DescribeSecret",
-      "secretsmanager:GetResourcePolicy",
-    ]
-    resources = [
-      "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:prog-strength-developer/*",
-    ]
-  }
-
   # Backend runtime secrets (prog-strength-backend/*). The apply pipeline
   # creates the containers (CreateSecret/TagResource) and seed-secrets.yml
   # writes their values (PutSecretValue/DescribeSecret). DescribeSecret and
   # GetResourcePolicy are also what the aws provider reads to refresh each
   # aws_secretsmanager_secret on every plan — once a container exists, a plan
   # fails without them. Scoped to prog-strength-backend/* so the same role
-  # manages every environment's backend secrets as they are added. Separate
-  # from the prog-strength-developer/* Describe grant above so the two secret
-  # families stay independently auditable. CI seeds values from GitHub; it
+  # manages every environment's backend secrets as they are added.
+  # CI seeds values from GitHub; it
   # never reads them back (no GetSecretValue here — only the instance role
   # reads values).
   statement {
@@ -249,24 +223,6 @@ data "aws_iam_policy_document" "permissions" {
     ]
   }
 
-  # Fleet run registry (per-SOW dispatch lock) — see
-  # prog-strength-docs/sows/fleet-dispatch-gating.md. This one role does
-  # double duty on this table:
-  #   - control plane: developer's `terraform apply` (this role) CREATES
-  #     and manages the table, and the aws provider calls several Describe*
-  #     APIs on every refresh — so a data-plane-only grant fails apply with
-  #     "not authorized to perform dynamodb:CreateTable".
-  #   - data plane: the Dispatch SOW workflow + worker acquire / attach /
-  #     release / list.
-  # Granting dynamodb:* scoped to the single table ARN covers both and is
-  # consistent with the ec2:*/ecr:*/s3:* resource-scoped statements above.
-  statement {
-    sid     = "FleetRunRegistry"
-    actions = ["dynamodb:*"]
-    resources = [
-      "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/prog-strength-developer-runs",
-    ]
-  }
 }
 
 resource "aws_iam_role_policy" "github_actions" {

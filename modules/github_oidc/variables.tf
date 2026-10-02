@@ -17,7 +17,6 @@ variable "main_branch_repos" {
     "prog-strength-agent",
     "prog-strength-mcp",
     "prog-strength-infra",
-    "prog-strength-developer",
   ]
 }
 
@@ -26,7 +25,6 @@ variable "pull_request_repos" {
   type        = list(string)
   default = [
     "prog-strength-infra",
-    "prog-strength-developer",
   ]
 }
 
