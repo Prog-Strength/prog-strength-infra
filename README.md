@@ -1,5 +1,11 @@
 # prog-strength-infra
 
+> [!NOTE]
+> **Prog Strength was retired in November 2026.** It is offline on purpose, to cut
+> hosting costs, and this repository is archived as read-only. progstrength.fitness
+> no longer serves the app. The database, media, and infrastructure state are kept in
+> cold storage; see [prog-strength-archive](https://github.com/Prog-Strength/prog-strength-archive).
+
 Terraform configuration for the Prog Strength backend host (single EC2 instance behind an
 Elastic IP, in a dedicated VPC with a public subnet). State lives in S3 with native
 S3 lockfile-based locking.
